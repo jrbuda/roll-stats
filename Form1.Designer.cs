@@ -33,6 +33,9 @@
             txtInputFile = new TextBox();
             dgvRollStats = new DataGridView();
             lstInputRead = new ListBox();
+            lstSkippedRolls = new ListView();
+            pgbStatus = new ProgressBar();
+            chbDebug = new CheckBox();
             ((System.ComponentModel.ISupportInitialize)dgvRollStats).BeginInit();
             SuspendLayout();
             // 
@@ -42,10 +45,9 @@
             // 
             // btnGetInputFile
             // 
-            btnGetInputFile.Location = new Point(17, 20);
-            btnGetInputFile.Margin = new Padding(4, 5, 4, 5);
+            btnGetInputFile.Location = new Point(12, 12);
             btnGetInputFile.Name = "btnGetInputFile";
-            btnGetInputFile.Size = new Size(216, 38);
+            btnGetInputFile.Size = new Size(151, 23);
             btnGetInputFile.TabIndex = 0;
             btnGetInputFile.Text = "Get Input File";
             btnGetInputFile.UseVisualStyleBackColor = true;
@@ -54,42 +56,66 @@
             // txtInputFile
             // 
             txtInputFile.Enabled = false;
-            txtInputFile.Location = new Point(241, 22);
-            txtInputFile.Margin = new Padding(4, 5, 4, 5);
+            txtInputFile.Location = new Point(169, 13);
             txtInputFile.Name = "txtInputFile";
-            txtInputFile.Size = new Size(280, 31);
+            txtInputFile.Size = new Size(197, 23);
             txtInputFile.TabIndex = 1;
             // 
             // dgvRollStats
             // 
             dgvRollStats.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize;
-            dgvRollStats.Location = new Point(17, 68);
-            dgvRollStats.Margin = new Padding(4, 5, 4, 5);
+            dgvRollStats.Location = new Point(12, 41);
             dgvRollStats.Name = "dgvRollStats";
             dgvRollStats.RowHeadersWidth = 62;
-            dgvRollStats.Size = new Size(1593, 527);
+            dgvRollStats.Size = new Size(1115, 316);
             dgvRollStats.TabIndex = 2;
             // 
             // lstInputRead
             // 
             lstInputRead.FormattingEnabled = true;
-            lstInputRead.ItemHeight = 25;
-            lstInputRead.Location = new Point(17, 605);
-            lstInputRead.Margin = new Padding(4, 5, 4, 5);
+            lstInputRead.ItemHeight = 15;
+            lstInputRead.Location = new Point(12, 363);
             lstInputRead.Name = "lstInputRead";
-            lstInputRead.Size = new Size(543, 154);
+            lstInputRead.Size = new Size(381, 94);
             lstInputRead.TabIndex = 3;
+            // 
+            // lstSkippedRolls
+            // 
+            lstSkippedRolls.Location = new Point(399, 363);
+            lstSkippedRolls.Name = "lstSkippedRolls";
+            lstSkippedRolls.Size = new Size(725, 242);
+            lstSkippedRolls.TabIndex = 4;
+            lstSkippedRolls.UseCompatibleStateImageBehavior = false;
+            // 
+            // pgbStatus
+            // 
+            pgbStatus.Location = new Point(12, 463);
+            pgbStatus.Name = "pgbStatus";
+            pgbStatus.Size = new Size(381, 40);
+            pgbStatus.TabIndex = 5;
+            // 
+            // chbDebug
+            // 
+            chbDebug.AutoSize = true;
+            chbDebug.Location = new Point(372, 15);
+            chbDebug.Name = "chbDebug";
+            chbDebug.Size = new Size(61, 19);
+            chbDebug.TabIndex = 6;
+            chbDebug.Text = "Debug";
+            chbDebug.UseVisualStyleBackColor = true;
             // 
             // Form1
             // 
-            AutoScaleDimensions = new SizeF(10F, 25F);
+            AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
-            ClientSize = new Size(1623, 884);
+            ClientSize = new Size(1136, 617);
+            Controls.Add(chbDebug);
+            Controls.Add(pgbStatus);
+            Controls.Add(lstSkippedRolls);
             Controls.Add(lstInputRead);
             Controls.Add(dgvRollStats);
             Controls.Add(txtInputFile);
             Controls.Add(btnGetInputFile);
-            Margin = new Padding(4, 5, 4, 5);
             Name = "Form1";
             Text = "Form1";
             ((System.ComponentModel.ISupportInitialize)dgvRollStats).EndInit();
@@ -104,5 +130,8 @@
         private TextBox txtInputFile;
         private DataGridView dgvRollStats;
         private ListBox lstInputRead;
+        private ListView lstSkippedRolls;
+        private ProgressBar pgbStatus;
+        private CheckBox chbDebug;
     }
 }

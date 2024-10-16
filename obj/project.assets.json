@@ -9,23 +9,22 @@
   },
   "packageFolders": {
     "C:\\Users\\thebu\\.nuget\\packages\\": {},
-    "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages": {}
+    "C:\\Program Files\\dotnet\\sdk\\NuGetFallbackFolder": {}
   },
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "C:\\Users\\thebu\\Documents\\Code\\Roll Stats\\Roll-stats\\Roll-stats.csproj",
+      "projectUniqueName": "E:\\code_stuff\\roll-stats\\Roll-stats.csproj",
       "projectName": "Roll-stats",
-      "projectPath": "C:\\Users\\thebu\\Documents\\Code\\Roll Stats\\Roll-stats\\Roll-stats.csproj",
+      "projectPath": "E:\\code_stuff\\roll-stats\\Roll-stats.csproj",
       "packagesPath": "C:\\Users\\thebu\\.nuget\\packages\\",
-      "outputPath": "C:\\Users\\thebu\\Documents\\Code\\Roll Stats\\Roll-stats\\obj\\",
+      "outputPath": "E:\\code_stuff\\roll-stats\\obj\\",
       "projectStyle": "PackageReference",
       "fallbackFolders": [
-        "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
+        "C:\\Program Files\\dotnet\\sdk\\NuGetFallbackFolder"
       ],
       "configFilePaths": [
         "C:\\Users\\thebu\\AppData\\Roaming\\NuGet\\NuGet.Config",
-        "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.FallbackLocation.config",
         "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
       ],
       "originalTargetFrameworks": [
@@ -34,6 +33,7 @@
       "sources": {
         "C:\\Program Files (x86)\\Microsoft SDKs\\NuGetPackages\\": {},
         "C:\\Program Files\\dotnet\\library-packs": {},
+        "https://293-dev-sstnuget.azurewebsites.net/nuget": {},
         "https://api.nuget.org/v3/index.json": {}
       },
       "frameworks": {
@@ -75,7 +75,7 @@
             "privateAssets": "none"
           }
         },
-        "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\8.0.400/PortableRuntimeIdentifierGraph.json"
+        "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\8.0.403/PortableRuntimeIdentifierGraph.json"
       }
     }
   }

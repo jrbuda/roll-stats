@@ -1,32 +1,40 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
+using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 
 namespace Roll_stats
 {
     public partial class Form1 : Form
     {
+        private const string ChunkDelimiter = "---------------------------";
+        private static readonly HashSet<string> PlayerNames = new HashSet<string> { "vanta", "thomas ramore", "ruby", "naakopraan", "keke", "jinx", "jimothy", "bimothy", "timothy" };
+        private static readonly Regex rollLineRegex = new Regex(
+            @"^(?<rollExpr>.+?)\s*=\s*(?<outcomes>.+?)\s*=\s*(?<total>\d+(\.\d+)?)$",
+            RegexOptions.Compiled);
+
         public Form1()
         {
             InitializeComponent();
         }
 
-        private void btnGetInputFile_Click(object sender, EventArgs e)
+        private async void btnGetInputFile_Click(object sender, EventArgs e)
         {
             using (OpenFileDialog openFileDialog = new OpenFileDialog())
             {
-                ofdInputFile.InitialDirectory = "c:\\";
-                ofdInputFile.Filter = "All files (*.*)|*.*|Text files (*.txt)|*.txt";
-                ofdInputFile.FilterIndex = 1;
-                ofdInputFile.RestoreDirectory = true;
+                openFileDialog.InitialDirectory = "e:\\";
+                openFileDialog.Filter = "All files (*.*)|*.*|Text files (*.txt)|*.txt";
+                openFileDialog.FilterIndex = 1;
+                openFileDialog.RestoreDirectory = true;
 
-                if (ofdInputFile.ShowDialog() == DialogResult.OK)
+                if (openFileDialog.ShowDialog() == DialogResult.OK)
                 {
-                    // Get the path of specified file
-                    txtInputFile.Text = ofdInputFile.FileName;
-                    getRollStats(ofdInputFile.FileName);
+                    txtInputFile.Text = openFileDialog.FileName;
+                    await Task.Run(() => getRollStats(openFileDialog.FileName));
                 }
             }
         }
@@ -35,90 +43,211 @@ namespace Roll_stats
         {
             try
             {
-                string fileContents = File.ReadAllText(inputFilepath);
-                string[] playerNames = { "vanta", "thomas ramore", "ruby", "naakopraan", "keke", "jinx", "jimothy", "bimothy", "timothy" };
-                // Explode the file contents into chunks
-                string[] chatChunks = fileContents.Split(new string[] { "---------------------------" }, StringSplitOptions.RemoveEmptyEntries);
+                // Determine if debugging is enabled
+                bool isDebug = chbDebug.Checked;
 
-                // Dictionary to store rolls per player
-                Dictionary<string, Dictionary<string, List<int>>> playerRollOutcomes = new Dictionary<string, Dictionary<string, List<int>>>();
+                // Only create debug lists if debugging is enabled
+                Dictionary<string, Dictionary<string, List<double>>> playerRollOutcomes = new Dictionary<string, Dictionary<string, List<double>>>();
+                List<string> skippedLines = isDebug ? new List<string>() : null;
+                List<string> inputReadItems = isDebug ? new List<string>() : null;
 
-                // Regex to identify rolls (e.g., 3d6, 1d20)
-                Regex rollRegex = new Regex(@"\b\d+d\d+\b");
+                int totalLines = File.ReadLines(inputFilepath).Count();
+                int linesProcessed = 0;
+                int currentLineNumber = 0;
+                int lastProgress = 0;
 
-                foreach (string chunk in chatChunks)
+                using (var reader = new StreamReader(inputFilepath))
                 {
-                    string[] lines = chunk.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
-                    string name = "";
-                    bool containsValidRoll = false;
+                    List<string> chunkLines = new List<string>();
+                    string currentLine;
 
-                    // Check if the chunk contains a valid roll line
-                    for (int i = 0; i < lines.Length; i++)
+                    while ((currentLine = reader.ReadLine()) != null)
                     {
-                        if (lines[i].Count(c => c == '=') > 1)
+                        currentLineNumber++;
+
+                        currentLine = currentLine.Trim();
+                        linesProcessed++;
+
+                        if (currentLine == ChunkDelimiter)
                         {
-                            containsValidRoll = true;
-                            break;
+                            ProcessChunk(chunkLines, playerRollOutcomes, isDebug, skippedLines, inputReadItems, currentLineNumber - chunkLines.Count);
+                            chunkLines.Clear();
+                        }
+                        else
+                        {
+                            chunkLines.Add(currentLine);
+                        }
+
+                        // Update progress bar more frequently to reflect ongoing progress
+                        int progress = (int)((double)linesProcessed / totalLines * 100);
+                        if (progress > lastProgress)
+                        {
+                            lastProgress = progress;
+                            Invoke(new Action(() => pgbStatus.Value = progress));
                         }
                     }
 
-                    if (!containsValidRoll) continue;
-
-                    if (lines.Length > 0)
+                    // Process any remaining chunk
+                    if (chunkLines.Count > 0)
                     {
-                        name = lines[0].Substring(lines[0].LastIndexOf("]") + 1).Trim().ToLower();
-                    }
-
-                    if (!Array.Exists(playerNames, element => element.Equals(name, StringComparison.OrdinalIgnoreCase)))
-                    {
-                        continue;
-                    }
-
-                    // Ensure the player has an entry in the dictionary
-                    if (!playerRollOutcomes.ContainsKey(name))
-                    {
-                        playerRollOutcomes[name] = new Dictionary<string, List<int>>();
-                    }
-
-                    for (int i = 0; i < lines.Length; i++)
-                    {
-                        if (lines[i].Count(c => c == '=') > 1)
-                        {
-                            // Split the line on '=' to separate rolls from outcomes
-                            string[] parts = lines[i].Split('=');
-
-                            // Extract the rolls from the first part
-                            string[] rolls = parts[0].Split(new[] { '+', ' ' }, StringSplitOptions.RemoveEmptyEntries);
-
-                            // Extract the outcomes from the second part
-                            string[] outcomes = parts[1].Split(new[] { '+', ' ' }, StringSplitOptions.RemoveEmptyEntries);
-
-                            for (int j = 0; j < rolls.Length; j++)
-                            {
-                                string roll = rolls[j];
-                                if (rollRegex.IsMatch(roll))
-                                {
-                                    int outcome = int.Parse(outcomes[j]);
-
-                                    // Store the roll and its outcome in the player's dictionary
-                                    if (!playerRollOutcomes[name].ContainsKey(roll))
-                                    {
-                                        playerRollOutcomes[name][roll] = new List<int>();
-                                    }
-                                    playerRollOutcomes[name][roll].Add(outcome);
-
-                                    // Add "1d20" rolls to lstInputItems
-                                    if (roll == "1d20")
-                                    {
-                                        lstInputRead.Items.Add($"{name}: Rolled a 1d20, Outcome: {outcome}");
-                                    }
-                                }
-                            }
-                        }
+                        ProcessChunk(chunkLines, playerRollOutcomes, isDebug, skippedLines, inputReadItems, currentLineNumber - chunkLines.Count);
                     }
                 }
 
-                // Display the results (for example, in a DataGridView)
+                // Update UI lists only if debugging is enabled
+                if (isDebug)
+                {
+                    Invoke(new Action(() =>
+                    {
+                        lstSkippedRolls.Items.AddRange(skippedLines.Select(line => new ListViewItem(line)).ToArray());
+                        lstInputRead.Items.AddRange(inputReadItems.Select(item => new ListViewItem(item)).ToArray());
+                    }));
+                }
+
+                UpdateRollStatsGrid(playerRollOutcomes);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("An error occurred: " + ex.Message);
+            }
+        }
+
+        private void ProcessChunk(List<string> chunkLines, Dictionary<string, Dictionary<string, List<double>>> playerRollOutcomes, bool isDebug, List<string> skippedLines = null, List<string> inputReadItems = null, int startingLineNumber = 0)
+        {
+            if (chunkLines.Count == 0) return;
+
+            string name = ExtractPlayerName(chunkLines[0]);
+
+            if (string.IsNullOrEmpty(name) || !PlayerNames.Contains(name)) return;
+
+            if (!playerRollOutcomes.TryGetValue(name, out var playerRolls))
+            {
+                playerRolls = new Dictionary<string, List<double>>();
+                playerRollOutcomes[name] = playerRolls;
+            }
+
+            for (int i = 0; i < chunkLines.Count; i++)
+            {
+                if (!ParseRollLine(chunkLines[i], playerRolls, isDebug, startingLineNumber + i, skippedLines, inputReadItems))
+                {
+                    if (isDebug && skippedLines != null)
+                    {
+                        skippedLines.Add($"{chunkLines[i]}\nSkipped at line {startingLineNumber + i}");
+                    }
+                }
+            }
+        }
+
+        private string ExtractPlayerName(string line)
+        {
+            int index = line.LastIndexOf("]");
+            if (index != -1 && index + 1 < line.Length)
+            {
+                return line.Substring(index + 1).Trim().ToLower();
+            }
+            return string.Empty;
+        }
+
+        private bool ParseRollLine(string line, Dictionary<string, List<double>> playerRolls, bool isDebug, int lineNumber, List<string> skippedLines = null, List<string> inputReadItems = null)
+        {
+            line = line.Trim();
+
+            // Simplified regex to capture the roll expression and outcomes
+            var pattern = @"^(?<rollExpr>.+?)\s*=\s*(?<outcomes>.+?)\s*=\s*(?<total>.+)$";
+            var match = Regex.Match(line, pattern);
+            if (!match.Success)
+            {
+                if (isDebug && skippedLines != null)
+                {
+                    skippedLines.Add($"{line}\nInvalid format at line {lineNumber}");
+                }
+                return false;
+            }
+
+            var rollExpr = match.Groups["rollExpr"].Value.Trim();       // e.g., "1d8"
+            var outcomesStr = match.Groups["outcomes"].Value.Trim();    // e.g., "4"
+
+            // Extract dice rolls from the roll expression
+            var diceRollMatches = Regex.Matches(rollExpr, @"\b\d+d\d+(?:kh\d*|kl\d*)?\b");
+            var diceRolls = diceRollMatches.Cast<Match>().Select(m => m.Value).ToList();
+
+            // Extract numbers from the outcomes expression
+            var outcomeMatches = Regex.Matches(outcomesStr, @"-?\d+(\.\d+)?");
+            var outcomeValues = outcomeMatches.Cast<Match>().Select(m => m.Value).ToList();
+
+            if (diceRolls.Count == 1 && outcomeValues.Count == 1)
+            {
+                // Handle the case where there's a single roll and a single outcome
+                var diceRoll = diceRolls[0];
+                var outcomeStr = outcomeValues[0];
+
+                if (!double.TryParse(outcomeStr, NumberStyles.Any, CultureInfo.InvariantCulture, out double outcome))
+                {
+                    if (isDebug && skippedLines != null)
+                    {
+                        skippedLines.Add($"Invalid outcome value at line {lineNumber}: {outcomeStr} in line: {line}");
+                    }
+                    return false;
+                }
+
+                if (!playerRolls.ContainsKey(diceRoll))
+                {
+                    playerRolls[diceRoll] = new List<double>();
+                }
+                playerRolls[diceRoll].Add(outcome);
+
+                if (isDebug && inputReadItems != null)
+                {
+                    inputReadItems.Add($"{diceRoll}: Outcome: {outcome}");
+                }
+
+                return true;
+            }
+
+            if (diceRolls.Count > outcomeValues.Count)
+            {
+                if (isDebug && skippedLines != null)
+                {
+                    skippedLines.Add($"Not enough outcomes for dice rolls at line {lineNumber}: {line}");
+                }
+                return false;
+            }
+
+            // Process each dice roll and corresponding outcome
+            for (int i = 0; i < diceRolls.Count; i++)
+            {
+                var diceRoll = diceRolls[i];
+                var outcomeStr = outcomeValues[i];
+
+                if (!double.TryParse(outcomeStr, NumberStyles.Any, CultureInfo.InvariantCulture, out double outcome))
+                {
+                    if (isDebug && skippedLines != null)
+                    {
+                        skippedLines.Add($"Invalid outcome value at line {lineNumber}: {outcomeStr} in line: {line}");
+                    }
+                    return false;
+                }
+
+                if (!playerRolls.ContainsKey(diceRoll))
+                {
+                    playerRolls[diceRoll] = new List<double>();
+                }
+                playerRolls[diceRoll].Add(outcome);
+
+                if (isDebug && inputReadItems != null)
+                {
+                    inputReadItems.Add($"{diceRoll}: Outcome: {outcome}");
+                }
+            }
+
+            return true;
+        }
+
+        private void UpdateRollStatsGrid(Dictionary<string, Dictionary<string, List<double>>> playerRollOutcomes)
+        {
+            Invoke(new Action(() =>
+            {
+                dgvRollStats.SuspendLayout();
                 dgvRollStats.Rows.Clear();
                 dgvRollStats.Columns.Clear();
 
@@ -135,12 +264,14 @@ namespace Roll_stats
                 {
                     foreach (var roll in playerRollOutcomes[player].Keys)
                     {
-                        List<int> outcomes = playerRollOutcomes[player][roll];
+                        List<double> outcomes = playerRollOutcomes[player][roll];
+                        List<double> sortedOutcomes = outcomes.OrderBy(o => o).ToList();
+
                         double average = outcomes.Average();
-                        double median = GetMedian(outcomes);
-                        int mode = GetMode(outcomes);
+                        double median = GetMedian(sortedOutcomes);
+                        double mode = GetMode(sortedOutcomes);
                         int countOnes = outcomes.Count(o => o == 1);
-                        int maxRollValue = GetMaxRollValue(roll);
+                        double maxRollValue = GetMaxRollValue(roll);
                         int countMax = outcomes.Count(o => o == maxRollValue);
                         int totalRolls = outcomes.Count;
 
@@ -148,32 +279,25 @@ namespace Roll_stats
                     }
                 }
 
-                // Sort the rows in alphabetical order based on the "Player" column
                 dgvRollStats.Sort(dgvRollStats.Columns["Player"], System.ComponentModel.ListSortDirection.Ascending);
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show("An error occurred while reading the file: " + ex.Message);
-            }
+                dgvRollStats.ResumeLayout();
+            }));
         }
 
-        private double GetMedian(List<int> numbers)
+        private double GetMedian(List<double> sortedNumbers)
         {
-            var sortedNumbers = numbers.OrderBy(n => n).ToList();
             int count = sortedNumbers.Count;
             if (count % 2 == 0)
             {
-                // Even number of elements
                 return (sortedNumbers[count / 2 - 1] + sortedNumbers[count / 2]) / 2.0;
             }
             else
             {
-                // Odd number of elements
                 return sortedNumbers[count / 2];
             }
         }
 
-        private int GetMode(List<int> numbers)
+        private double GetMode(List<double> numbers)
         {
             return numbers.GroupBy(n => n)
                           .OrderByDescending(g => g.Count())
@@ -182,10 +306,19 @@ namespace Roll_stats
                           .FirstOrDefault();
         }
 
-        private int GetMaxRollValue(string roll)
+        private double GetMaxRollValue(string roll)
         {
-            // Extract the maximum value from the roll (e.g., for "1d20", return 20)
-            return int.Parse(roll.Split('d')[1]);
+            // Handling cases where roll may contain modifiers like "kh" or "kl"
+            var match = Regex.Match(roll, @"\d+d(\d+)");
+            if (match.Success)
+            {
+                var rollValueStr = match.Groups[1].Value;
+                if (double.TryParse(rollValueStr, NumberStyles.Any, CultureInfo.InvariantCulture, out double rollValue))
+                {
+                    return rollValue;
+                }
+            }
+            return 0; // Return 0 if unable to parse
         }
     }
 }
