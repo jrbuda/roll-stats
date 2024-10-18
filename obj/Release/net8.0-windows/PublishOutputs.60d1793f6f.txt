@@ -1,0 +1,5 @@
+E:\code_stuff\roll-stats\bin\Release\net8.0-windows\Roll-stats.exe
+E:\code_stuff\roll-stats\bin\Release\net8.0-windows\Roll-stats.dll
+E:\code_stuff\roll-stats\bin\Release\net8.0-windows\Roll-stats.deps.json
+E:\code_stuff\roll-stats\bin\Release\net8.0-windows\Roll-stats.runtimeconfig.json
+E:\code_stuff\roll-stats\bin\Release\net8.0-windows\Roll-stats.pdb

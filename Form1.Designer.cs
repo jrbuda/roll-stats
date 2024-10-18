@@ -28,6 +28,7 @@
         /// </summary>
         private void InitializeComponent()
         {
+            System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(Form1));
             ofdInputFile = new OpenFileDialog();
             btnGetInputFile = new Button();
             txtInputFile = new TextBox();
@@ -36,6 +37,9 @@
             lstSkippedRolls = new ListView();
             pgbStatus = new ProgressBar();
             chbDebug = new CheckBox();
+            lblProgress = new Label();
+            clbCharacters = new CheckedListBox();
+            lblCharacters = new Label();
             ((System.ComponentModel.ISupportInitialize)dgvRollStats).BeginInit();
             SuspendLayout();
             // 
@@ -78,6 +82,7 @@
             lstInputRead.Name = "lstInputRead";
             lstInputRead.Size = new Size(381, 94);
             lstInputRead.TabIndex = 3;
+            lstInputRead.Visible = false;
             // 
             // lstSkippedRolls
             // 
@@ -86,6 +91,7 @@
             lstSkippedRolls.Size = new Size(725, 242);
             lstSkippedRolls.TabIndex = 4;
             lstSkippedRolls.UseCompatibleStateImageBehavior = false;
+            lstSkippedRolls.Visible = false;
             // 
             // pgbStatus
             // 
@@ -103,12 +109,44 @@
             chbDebug.TabIndex = 6;
             chbDebug.Text = "Debug";
             chbDebug.UseVisualStyleBackColor = true;
+            chbDebug.CheckedChanged += chbDebug_CheckedChanged;
+            // 
+            // lblProgress
+            // 
+            lblProgress.AutoSize = true;
+            lblProgress.Location = new Point(12, 506);
+            lblProgress.Name = "lblProgress";
+            lblProgress.Size = new Size(52, 15);
+            lblProgress.TabIndex = 7;
+            lblProgress.Text = "Progress";
+            // 
+            // clbCharacters
+            // 
+            clbCharacters.BackColor = SystemColors.ScrollBar;
+            clbCharacters.FormattingEnabled = true;
+            clbCharacters.Location = new Point(1133, 41);
+            clbCharacters.Name = "clbCharacters";
+            clbCharacters.Size = new Size(218, 562);
+            clbCharacters.TabIndex = 10;
+            clbCharacters.ItemCheck += clbCharacters_ItemCheck;
+            // 
+            // lblCharacters
+            // 
+            lblCharacters.AutoSize = true;
+            lblCharacters.Location = new Point(1170, 23);
+            lblCharacters.Name = "lblCharacters";
+            lblCharacters.Size = new Size(143, 15);
+            lblCharacters.TabIndex = 11;
+            lblCharacters.Text = "Select from the list below!";
             // 
             // Form1
             // 
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
-            ClientSize = new Size(1136, 617);
+            ClientSize = new Size(1356, 617);
+            Controls.Add(lblCharacters);
+            Controls.Add(clbCharacters);
+            Controls.Add(lblProgress);
             Controls.Add(chbDebug);
             Controls.Add(pgbStatus);
             Controls.Add(lstSkippedRolls);
@@ -116,8 +154,9 @@
             Controls.Add(dgvRollStats);
             Controls.Add(txtInputFile);
             Controls.Add(btnGetInputFile);
+            Icon = (Icon)resources.GetObject("$this.Icon");
             Name = "Form1";
-            Text = "Form1";
+            Text = "Roll Stats!";
             ((System.ComponentModel.ISupportInitialize)dgvRollStats).EndInit();
             ResumeLayout(false);
             PerformLayout();
@@ -133,5 +172,8 @@
         private ListView lstSkippedRolls;
         private ProgressBar pgbStatus;
         private CheckBox chbDebug;
+        private Label lblProgress;
+        private CheckedListBox clbCharacters;
+        private Label lblCharacters;
     }
 }
