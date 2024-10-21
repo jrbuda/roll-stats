@@ -50,3 +50,4 @@ E:\code_stuff\roll-stats\obj\Debug\net8.0-windows\ref\Roll-stats.dll
 E:\code_stuff\roll-stats\bin\Debug\net8.0-windows\Newtonsoft.Json.dll
 E:\code_stuff\roll-stats\obj\Debug\net8.0-windows\Roll-stats.csproj.AssemblyReference.cache
 E:\code_stuff\roll-stats\obj\Debug\net8.0-windows\Roll-stats.csproj.Up2Date
+E:\code_stuff\roll-stats\obj\Debug\net8.0-windows\Roll_stats.Properties.Resources.resources
