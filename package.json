@@ -1,0 +1,27 @@
+{
+  "name": "roll-stats",
+  "version": "2.0.0",
+  "description": "A program to help break down FoundryVTT ldb/chat logs for you to see statistics about your game overtime",
+  "main": "roll-stats.exe",
+  "scripts": {
+    "test": "N/A"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jrbuda/roll-stats.git"
+  },
+  "keywords": [
+    "FoundryVTT",
+    "ldb",
+    "stats"
+  ],
+  "author": "JR Buda",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/jrbuda/roll-stats/issues"
+  },
+  "homepage": "https://github.com/jrbuda/roll-stats#readme",
+  "dependencies": {
+    "level": "^8.0.1"
+  }
+}
