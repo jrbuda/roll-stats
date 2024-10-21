@@ -12,6 +12,8 @@ Welcome to **Roll Stats**, a utility for breaking down and analyzing FoundryVTT 
 
 1. Download the `roll-stats-AllInOne.zip` file from the repository and unzip it.
 
+Make sure to shut down FoundryVTT before proceeding.
+
 2. Enter the newly created folder and install the required dependencies (or run install.bat):
    ```bash
    npm install
@@ -24,7 +26,7 @@ Welcome to **Roll Stats**, a utility for breaking down and analyzing FoundryVTT 
    roll-stats.exe
    ```
 
-4. Target the `/messages` folder in your FoundryVTT instance. For example, it may be located at:
+4. Target the `/messages` folder in your FoundryVTT instance. Make sure FoundryVTT is completely shut down before proceeding. For example, it may be located at:
    ```
    C:\Users\yourusername\Desktop\FoundryVTT\Data\worlds\yourworldname\data\messages
    ```
