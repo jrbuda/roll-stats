@@ -17,7 +17,7 @@ Welcome to **Roll Stats**, a utility for breaking down and analyzing FoundryVTT 
    npm install
    ```
 
-   **Note:** Ensure you have Node.js installed. The `level` library is required for `ldb-reader.js` to work properly. The `package.json` file includes this dependency, so running `npm install` will handle it for you.
+   **Note:** Ensure you have Node.js and npm installed. You can download Node.js, which includes npm, from [https://nodejs.org/](https://nodejs.org/). Follow the instructions for your operating system to complete the installation. The `level` library is required for `ldb-reader.js` to work properly, and the `package.json` file includes this dependency, so running `npm install` will handle it for you.
 
 3. Run the program:
    ```bash
