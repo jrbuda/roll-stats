@@ -1,54 +1,45 @@
 using System;
 using System.Collections.Generic;
-using System.Globalization;
+using System.Data;
+using System.Diagnostics; // For Process class
 using System.IO;
 using System.Linq;
+using System.Text;
 using System.Text.RegularExpressions;
-using System.Threading.Tasks;
 using System.Windows.Forms;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 namespace Roll_stats
 {
     public partial class Form1 : Form
     {
-        private const string ChunkDelimiter = "---------------------------";
-        private static readonly Regex rollLineRegex = new Regex(
-            @"^(?<rollExpr>.+?)\s*=\s*(?<outcomes>.+?)\s*=\s*(?<total>.+)$",
-            RegexOptions.Compiled);
-
-        // Class-level variable to store all stats
-        private Dictionary<string, Dictionary<string, List<double>>> allPlayerRollOutcomes = new Dictionary<string, Dictionary<string, List<double>>>();
+        private Dictionary<string, PlayerData> allPlayerRollOutcomes = new Dictionary<string, PlayerData>();
 
         public Form1()
         {
             InitializeComponent();
-            // Subscribe to the ItemCheck event
             clbCharacters.ItemCheck += clbCharacters_ItemCheck;
-            // Hide debug lists initially
-            lstSkippedRolls.Visible = false;
-            lstInputRead.Visible = false;
-
-            // Set up global exception handlers
+            dgvRollStats.SelectionChanged += dgvRollStats_SelectionChanged;
             Application.ThreadException += Application_ThreadException;
             AppDomain.CurrentDomain.UnhandledException += CurrentDomain_UnhandledException;
         }
 
-        // Global exception handler for UI thread exceptions
         private void Application_ThreadException(object sender, System.Threading.ThreadExceptionEventArgs e)
         {
             LogError(e.Exception);
-            MessageBox.Show("An unexpected error occurred. Please check the error.log file for details.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            MessageBox.Show("An unexpected error occurred. Please check the error.log file for details.",
+                "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
 
-        // Global exception handler for non-UI thread exceptions
         private void CurrentDomain_UnhandledException(object sender, UnhandledExceptionEventArgs e)
         {
             Exception ex = e.ExceptionObject as Exception;
             LogError(ex);
-            MessageBox.Show("A critical error occurred. Please check the error.log file for details.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            MessageBox.Show("A critical error occurred. Please check the error.log file for details.",
+                "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
 
-        // Method to log errors to error.log file
         private void LogError(Exception ex)
         {
             try
@@ -59,7 +50,7 @@ namespace Roll_stats
             }
             catch
             {
-                // If logging fails, there's not much we can do
+                // Ignored
             }
         }
 
@@ -67,43 +58,160 @@ namespace Roll_stats
         {
             try
             {
-                using (OpenFileDialog openFileDialog = new OpenFileDialog())
+                // Ask the user to choose between LevelDB directory or output.txt file
+                DialogResult result = MessageBox.Show(
+                    "Do you want to select a LevelDB directory?\n\nClick Yes to select a LevelDB directory.\nClick No to select an existing output.txt file.",
+                    "Select Input Type", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Question);
+
+                if (result == DialogResult.Yes)
                 {
-                    openFileDialog.InitialDirectory = "e:\\";
-                    openFileDialog.Filter = "All files (*.*)|*.*|Text files (*.txt)|*.txt";
-                    openFileDialog.FilterIndex = 1;
-                    openFileDialog.RestoreDirectory = true;
-
-                    if (openFileDialog.ShowDialog() == DialogResult.OK)
+                    // User wants to select LevelDB directory
+                    using (FolderBrowserDialog folderBrowserDialog = new FolderBrowserDialog())
                     {
-                        txtInputFile.Text = openFileDialog.FileName;
-
-                        // Clear previous data and disable controls during parsing
-                        Invoke(new Action(() =>
+                        folderBrowserDialog.Description = "Select the FoundryVTT 'messages' LevelDB directory";
+                        if (folderBrowserDialog.ShowDialog() == DialogResult.OK)
                         {
-                            clbCharacters.Items.Clear();
-                            dgvRollStats.Rows.Clear();
-                            lstSkippedRolls.Items.Clear();
-                            lstInputRead.Items.Clear();
-                            clbCharacters.Enabled = false;
-                            pgbStatus.Value = 0;
-                        }));
+                            string dbPath = folderBrowserDialog.SelectedPath;
+                            txtInputFile.Text = dbPath;
 
-                        // Parse the file to extract character names and stats
-                        await Task.Run(() => ParseFileAndExtractStats(openFileDialog.FileName));
+                            Invoke(new Action(() =>
+                            {
+                                clbCharacters.Items.Clear();
+                                dgvRollStats.Rows.Clear();
+                                dgvRollReasons.Rows.Clear();
+                                lstSkippedRolls.Items.Clear();
+                                lstInputRead.Items.Clear();
+                                clbCharacters.Enabled = false;
+                                pgbStatus.Value = 0;
+                            }));
 
-                        // Enable controls after parsing
-                        Invoke(new Action(() =>
-                        {
-                            clbCharacters.Enabled = true;
-                        }));
+                            await Task.Run(() => RunNodeScriptAndParseData(dbPath));
+
+                            Invoke(new Action(() =>
+                            {
+                                clbCharacters.Enabled = true;
+                                pgbStatus.Value = 100; // Ensure progress bar reaches 100%
+                            }));
+                        }
                     }
+                }
+                else if (result == DialogResult.No)
+                {
+                    // User wants to select output.txt file
+                    using (OpenFileDialog openFileDialog = new OpenFileDialog())
+                    {
+                        openFileDialog.InitialDirectory = "e:\\";
+                        openFileDialog.Filter = "Text files (*.txt)|*.txt|All files (*.*)|*.*";
+                        openFileDialog.FilterIndex = 1;
+                        openFileDialog.RestoreDirectory = true;
+
+                        if (openFileDialog.ShowDialog() == DialogResult.OK)
+                        {
+                            string outputFilePath = openFileDialog.FileName;
+                            txtInputFile.Text = outputFilePath;
+
+                            Invoke(new Action(() =>
+                            {
+                                clbCharacters.Items.Clear();
+                                dgvRollStats.Rows.Clear();
+                                dgvRollReasons.Rows.Clear();
+                                lstSkippedRolls.Items.Clear();
+                                lstInputRead.Items.Clear();
+                                clbCharacters.Enabled = false;
+                                pgbStatus.Value = 0;
+                            }));
+
+                            await Task.Run(() => ParseFileAndExtractStats(outputFilePath));
+
+                            Invoke(new Action(() =>
+                            {
+                                clbCharacters.Enabled = true;
+                                pgbStatus.Value = 100; // Ensure progress bar reaches 100%
+                            }));
+                        }
+                    }
+                }
+                else
+                {
+                    // User canceled the operation
                 }
             }
             catch (Exception ex)
             {
                 LogError(ex);
-                MessageBox.Show("An error occurred while opening the file. Please check the error.log file for details.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show("An error occurred while selecting the input. Please check the error.log file for details.",
+                    "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void RunNodeScriptAndParseData(string dbPath)
+        {
+            try
+            {
+                // Path to your Node.js script in the same directory as the executable
+                string nodeScriptPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "ldb-reader.js");
+
+                // Check if the script exists
+                if (!File.Exists(nodeScriptPath))
+                {
+                    throw new FileNotFoundException("Node.js script file not found in the application directory.", nodeScriptPath);
+                }
+
+                // Define the output file path in the same directory
+                string outputFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "output.txt");
+
+                // Build the arguments to pass to the script
+                string args = $"\"{nodeScriptPath}\" \"{dbPath}\" \"{outputFilePath}\"";
+
+                // Start the Node.js process
+                ProcessStartInfo startInfo = new ProcessStartInfo
+                {
+                    FileName = "node",
+                    Arguments = args,
+                    UseShellExecute = false,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    CreateNoWindow = true
+                };
+
+                using (Process process = new Process { StartInfo = startInfo })
+                {
+                    // Event handlers for output and error data
+                    process.OutputDataReceived += (sender, e) =>
+                    {
+                        if (!string.IsNullOrEmpty(e.Data))
+                        {
+                            // Optionally handle standard output
+                        }
+                    };
+                    process.ErrorDataReceived += (sender, e) =>
+                    {
+                        if (!string.IsNullOrEmpty(e.Data))
+                        {
+                            LogError(new Exception(e.Data));
+                        }
+                    };
+
+                    process.Start();
+                    process.BeginOutputReadLine();
+                    process.BeginErrorReadLine();
+
+                    process.WaitForExit();
+
+                    if (process.ExitCode != 0)
+                    {
+                        throw new Exception("Node.js script exited with a non-zero exit code.");
+                    }
+                }
+
+                // After the Node.js script has finished, parse the output.txt file
+                ParseFileAndExtractStats(outputFilePath);
+            }
+            catch (Exception ex)
+            {
+                LogError(ex);
+                MessageBox.Show("An error occurred while running the Node.js script. Please check the error.log file for details.",
+                    "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
@@ -115,62 +223,103 @@ namespace Roll_stats
                 List<string> skippedLines = isDebug ? new List<string>() : null;
                 List<string> inputReadItems = isDebug ? new List<string>() : null;
 
-                int totalLines = File.ReadLines(inputFilepath).Count();
-                int linesProcessed = 0;
-                int currentLineNumber = 0;
-                int lastProgress = 0;
+                allPlayerRollOutcomes = new Dictionary<string, PlayerData>();
 
-                allPlayerRollOutcomes = new Dictionary<string, Dictionary<string, List<double>>>();
+                // Read all lines into a list
+                List<string> lines = File.ReadAllLines(inputFilepath).ToList();
+                long totalLines = lines.Count;
+                long currentLine = 0;
 
-                using (var reader = new StreamReader(inputFilepath))
+                while (currentLine < totalLines)
                 {
-                    List<string> chunkLines = new List<string>();
-                    string currentLine;
+                    string line = lines[(int)currentLine].Trim();
 
-                    while ((currentLine = reader.ReadLine()) != null)
+                    if (line.StartsWith("Key:"))
                     {
-                        currentLineNumber++;
-
-                        currentLine = currentLine.Trim();
-                        linesProcessed++;
-
-                        if (currentLine == ChunkDelimiter)
+                        currentLine++; // Move to "Value:" line
+                        if (currentLine >= totalLines)
                         {
-                            ProcessChunk(chunkLines, allPlayerRollOutcomes, isDebug, skippedLines, inputReadItems, currentLineNumber - chunkLines.Count);
-                            chunkLines.Clear();
-                        }
-                        else
-                        {
-                            chunkLines.Add(currentLine);
+                            if (isDebug && skippedLines != null)
+                            {
+                                skippedLines.Add($"Unexpected end of file after 'Key:' at line {currentLine}");
+                            }
+                            break;
                         }
 
-                        // Update progress bar
-                        int progress = (int)((double)linesProcessed / totalLines * 100);
-                        if (progress > lastProgress)
+                        line = lines[(int)currentLine].Trim();
+                        if (!line.StartsWith("Value:"))
                         {
-                            lastProgress = progress;
-                            Invoke(new Action(() => pgbStatus.Value = progress));
+                            if (isDebug && skippedLines != null)
+                            {
+                                skippedLines.Add($"Expected 'Value:' after 'Key:' at line {currentLine}");
+                            }
+                            continue;
+                        }
+
+                        currentLine++; // Move to JSON lines
+                        StringBuilder jsonBuilder = new StringBuilder();
+                        int braceCount = 0;
+                        bool jsonStarted = false;
+
+                        while (currentLine < totalLines)
+                        {
+                            line = lines[(int)currentLine];
+                            jsonBuilder.AppendLine(line);
+
+                            // Count braces to detect end of JSON object
+                            braceCount += line.Count(c => c == '{');
+                            braceCount -= line.Count(c => c == '}');
+
+                            if (line.Contains("{"))
+                            {
+                                jsonStarted = true;
+                            }
+
+                            currentLine++;
+
+                            if (jsonStarted && braceCount == 0)
+                            {
+                                // JSON object is complete
+                                break;
+                            }
+                        }
+
+                        string json = jsonBuilder.ToString();
+                        if (!string.IsNullOrWhiteSpace(json) && IsValidJson(json))
+                        {
+                            // Process the JSON
+                            ProcessJson(json, isDebug, skippedLines, inputReadItems);
+                        }
+                        else if (isDebug && skippedLines != null)
+                        {
+                            skippedLines.Add($"Invalid JSON format starting at line {currentLine}");
                         }
                     }
-
-                    // Process any remaining chunk
-                    if (chunkLines.Count > 0)
+                    else
                     {
-                        ProcessChunk(chunkLines, allPlayerRollOutcomes, isDebug, skippedLines, inputReadItems, currentLineNumber - chunkLines.Count);
+                        if (isDebug && skippedLines != null)
+                        {
+                            skippedLines.Add($"Skipped non-JSON line: {line}");
+                        }
+                        currentLine++;
                     }
+
+                    // Update progress bar
+                    int progress = (int)(((double)currentLine / totalLines) * 100);
+                    Invoke(new Action(() =>
+                    {
+                        pgbStatus.Value = progress;
+                    }));
                 }
 
-                // Update the clbCharacters with the character names
                 var characterNames = new HashSet<string>(allPlayerRollOutcomes.Keys);
 
-                // Update UI elements on the main thread
                 Invoke(new Action(() =>
                 {
                     clbCharacters.Items.Clear();
                     clbCharacters.Items.AddRange(characterNames.OrderBy(n => n).ToArray());
                 }));
 
-                // Update debug lists if debugging is enabled
                 if (isDebug)
                 {
                     Invoke(new Action(() =>
@@ -183,36 +332,95 @@ namespace Roll_stats
             catch (Exception ex)
             {
                 LogError(ex);
-                MessageBox.Show("An error occurred while parsing the file. Please check the error.log file for details.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show("An error occurred while parsing the file. Please check the error.log file for details.",
+                    "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
-        private void ProcessChunk(List<string> chunkLines, Dictionary<string, Dictionary<string, List<double>>> playerRollOutcomes, bool isDebug, List<string> skippedLines = null, List<string> inputReadItems = null, int startingLineNumber = 0)
+        private void ProcessJson(string json, bool isDebug, List<string> skippedLines, List<string> inputReadItems)
         {
             try
             {
-                if (chunkLines.Count == 0) return;
+                JObject parsedJson = JObject.Parse(json);
 
-                string name = ExtractPlayerName(chunkLines[0]);
-
-                if (string.IsNullOrEmpty(name))
+                // Extract player name
+                string playerName = null;
+                if (parsedJson.TryGetValue("speaker", out JToken speakerToken))
                 {
-                    return; // Skip processing if name is empty
-                }
-
-                if (!playerRollOutcomes.TryGetValue(name, out var playerRolls))
-                {
-                    playerRolls = new Dictionary<string, List<double>>();
-                    playerRollOutcomes[name] = playerRolls;
-                }
-
-                for (int i = 0; i < chunkLines.Count; i++)
-                {
-                    if (!ParseRollLine(chunkLines[i], playerRolls, isDebug, startingLineNumber + i, skippedLines, inputReadItems))
+                    if (speakerToken.Type == JTokenType.Object)
                     {
-                        if (isDebug && skippedLines != null)
+                        playerName = speakerToken["alias"]?.ToString()?.ToLower();
+                    }
+                    else
+                    {
+                        // Skip entries where 'speaker' is not an object
+                        return;
+                    }
+                }
+                else
+                {
+                    // Skip entries without 'speaker'
+                    return;
+                }
+
+                if (string.IsNullOrEmpty(playerName))
+                {
+                    // Skip entries with missing alias
+                    return;
+                }
+
+                if (!allPlayerRollOutcomes.TryGetValue(playerName, out PlayerData playerData))
+                {
+                    playerData = new PlayerData { PlayerName = playerName };
+                    allPlayerRollOutcomes[playerName] = playerData;
+                }
+
+                JArray rolls = parsedJson["rolls"] as JArray;
+                if (rolls != null)
+                {
+                    foreach (var roll in rolls)
+                    {
+                        string flavor = roll["options"]?["flavor"]?.ToString() ?? "Unknown";
+
+                        JArray terms = roll["terms"] as JArray;
+                        if (terms == null) continue;
+
+                        foreach (var term in terms)
                         {
-                            skippedLines.Add($"{chunkLines[i]}\nSkipped at line {startingLineNumber + i}");
+                            if (term["class"]?.ToString() == "Die")
+                            {
+                                int number = term["number"]?.ToObject<int>() ?? 1;
+                                int faces = term["faces"]?.ToObject<int>() ?? 0;
+                                JArray modifiersArray = term["modifiers"] as JArray;
+                                string modifiers = modifiersArray != null && modifiersArray.Count > 0
+                                    ? string.Join("", modifiersArray.Select(m => m.ToString()))
+                                    : "";
+
+                                string diceRollKey = $"{number}d{faces}{modifiers}";
+
+                                if (!playerData.RollDataByKey.TryGetValue(diceRollKey, out RollData rollData))
+                                {
+                                    rollData = new RollData { DiceRollKey = diceRollKey };
+                                    playerData.RollDataByKey[diceRollKey] = rollData;
+                                }
+
+                                JArray results = term["results"] as JArray;
+                                if (results == null) continue;
+
+                                foreach (var result in results)
+                                {
+                                    if (result["active"]?.ToObject<bool>() == true)
+                                    {
+                                        double rollResult = result["result"]?.ToObject<double>() ?? 0;
+                                        rollData.Results.Add(new RollResult { Flavor = flavor, Value = rollResult });
+
+                                        if (isDebug && inputReadItems != null)
+                                        {
+                                            inputReadItems.Add($"{playerName}: {diceRollKey} ({flavor}) rolled {rollResult}");
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -222,139 +430,39 @@ namespace Roll_stats
                 LogError(ex);
                 if (isDebug && skippedLines != null)
                 {
-                    skippedLines.Add($"Error processing chunk starting at line {startingLineNumber}: {ex.Message}");
+                    skippedLines.Add($"Error parsing JSON: {ex.Message}");
                 }
             }
         }
 
-        private string ExtractPlayerName(string line)
+        private bool IsValidJson(string strInput)
         {
-            try
+            if (string.IsNullOrWhiteSpace(strInput)) { return false; }
+            strInput = strInput.Trim();
+            if ((strInput.StartsWith("{") && strInput.EndsWith("}")) || // For object
+                (strInput.StartsWith("[") && strInput.EndsWith("]")))   // For array
             {
-                int index = line.LastIndexOf("]");
-                if (index != -1 && index + 1 < line.Length)
+                try
                 {
-                    return line.Substring(index + 1).Trim().ToLower();
-                }
-            }
-            catch (Exception ex)
-            {
-                LogError(ex);
-            }
-            return string.Empty;
-        }
-
-        private bool ParseRollLine(string line, Dictionary<string, List<double>> playerRolls, bool isDebug, int lineNumber, List<string> skippedLines = null, List<string> inputReadItems = null)
-        {
-            try
-            {
-                line = line.Trim();
-
-                // Simplified regex to capture the roll expression and outcomes
-                var pattern = @"^(?<rollExpr>.+?)\s*=\s*(?<outcomes>.+?)\s*=\s*(?<total>.+)$";
-                var match = Regex.Match(line, pattern);
-                if (!match.Success)
-                {
-                    if (isDebug && skippedLines != null)
-                    {
-                        skippedLines.Add($"{line}\nInvalid format at line {lineNumber}");
-                    }
-                    return false;
-                }
-
-                var rollExpr = match.Groups["rollExpr"].Value.Trim();       // e.g., "1d8"
-                var outcomesStr = match.Groups["outcomes"].Value.Trim();    // e.g., "4"
-
-                // Extract dice rolls from the roll expression
-                var diceRollMatches = Regex.Matches(rollExpr, @"\b\d+d\d+(?:kh\d*|kl\d*)?\b");
-                var diceRolls = diceRollMatches.Cast<Match>().Select(m => m.Value).ToList();
-
-                // Extract numbers from the outcomes expression
-                var outcomeMatches = Regex.Matches(outcomesStr, @"-?\d+(\.\d+)?");
-                var outcomeValues = outcomeMatches.Cast<Match>().Select(m => m.Value).ToList();
-
-                if (diceRolls.Count == 1 && outcomeValues.Count == 1)
-                {
-                    // Handle the case where there's a single roll and a single outcome
-                    var diceRoll = diceRolls[0];
-                    var outcomeStr = outcomeValues[0];
-
-                    if (!double.TryParse(outcomeStr, NumberStyles.Any, CultureInfo.InvariantCulture, out double outcome))
-                    {
-                        if (isDebug && skippedLines != null)
-                        {
-                            skippedLines.Add($"Invalid outcome value at line {lineNumber}: {outcomeStr} in line: {line}");
-                        }
-                        return false;
-                    }
-
-                    if (!playerRolls.ContainsKey(diceRoll))
-                    {
-                        playerRolls[diceRoll] = new List<double>();
-                    }
-                    playerRolls[diceRoll].Add(outcome);
-
-                    if (isDebug && inputReadItems != null)
-                    {
-                        inputReadItems.Add($"{diceRoll}: Outcome: {outcome}");
-                    }
-
+                    var obj = JToken.Parse(strInput);
                     return true;
                 }
-
-                if (diceRolls.Count > outcomeValues.Count)
+                catch (JsonReaderException)
                 {
-                    if (isDebug && skippedLines != null)
-                    {
-                        skippedLines.Add($"Not enough outcomes for dice rolls at line {lineNumber}: {line}");
-                    }
                     return false;
                 }
-
-                // Process each dice roll and corresponding outcome
-                for (int i = 0; i < diceRolls.Count; i++)
+                catch (Exception)
                 {
-                    var diceRoll = diceRolls[i];
-                    var outcomeStr = outcomeValues[i];
-
-                    if (!double.TryParse(outcomeStr, NumberStyles.Any, CultureInfo.InvariantCulture, out double outcome))
-                    {
-                        if (isDebug && skippedLines != null)
-                        {
-                            skippedLines.Add($"Invalid outcome value at line {lineNumber}: {outcomeStr} in line: {line}");
-                        }
-                        return false;
-                    }
-
-                    if (!playerRolls.ContainsKey(diceRoll))
-                    {
-                        playerRolls[diceRoll] = new List<double>();
-                    }
-                    playerRolls[diceRoll].Add(outcome);
-
-                    if (isDebug && inputReadItems != null)
-                    {
-                        inputReadItems.Add($"{diceRoll}: Outcome: {outcome}");
-                    }
+                    return false;
                 }
-
-                return true;
             }
-            catch (Exception ex)
-            {
-                LogError(ex);
-                if (isDebug && skippedLines != null)
-                {
-                    skippedLines.Add($"Error parsing roll line at line {lineNumber}: {ex.Message}");
-                }
-                return false;
-            }
+            return false;
         }
 
         private void clbCharacters_ItemCheck(object sender, ItemCheckEventArgs e)
         {
-            // Schedule the update after the event handler completes
-            this.BeginInvoke((MethodInvoker)delegate {
+            this.BeginInvoke((MethodInvoker)delegate
+            {
                 try
                 {
                     UpdateRollStatsGridForSelectedCharacters();
@@ -362,7 +470,8 @@ namespace Roll_stats
                 catch (Exception ex)
                 {
                     LogError(ex);
-                    MessageBox.Show("An error occurred while updating the stats. Please check the error.log file for details.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    MessageBox.Show("An error occurred while updating the stats. Please check the error.log file for details.",
+                        "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 }
             });
         }
@@ -372,29 +481,27 @@ namespace Roll_stats
             try
             {
                 var selectedCharacters = clbCharacters.CheckedItems.Cast<string>().ToList();
-
-                // Prepare data to display
-                var displayData = new Dictionary<string, Dictionary<string, List<double>>>();
+                var displayData = new Dictionary<string, PlayerData>();
 
                 foreach (var character in selectedCharacters)
                 {
-                    if (allPlayerRollOutcomes.TryGetValue(character, out var playerRolls))
+                    if (allPlayerRollOutcomes.TryGetValue(character, out PlayerData playerData))
                     {
-                        displayData[character] = playerRolls;
+                        displayData[character] = playerData;
                     }
                 }
 
-                // Now update the DataGridView with displayData
                 UpdateRollStatsGrid(displayData);
             }
             catch (Exception ex)
             {
                 LogError(ex);
-                MessageBox.Show("An error occurred while preparing the data for display. Please check the error.log file for details.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show("An error occurred while preparing the data for display. Please check the error.log file for details.",
+                    "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
-        private void UpdateRollStatsGrid(Dictionary<string, Dictionary<string, List<double>>> playerRollOutcomes)
+        private void UpdateRollStatsGrid(Dictionary<string, PlayerData> playerRollOutcomes)
         {
             try
             {
@@ -413,22 +520,22 @@ namespace Roll_stats
                     dgvRollStats.Columns.Add("1s Rolled", "1s Rolled");
                     dgvRollStats.Columns.Add("Max Rolls", "Max Rolls");
 
-                    foreach (var player in playerRollOutcomes.Keys)
+                    foreach (var player in playerRollOutcomes.Values)
                     {
-                        foreach (var roll in playerRollOutcomes[player].Keys)
+                        foreach (var rollData in player.RollDataByKey.Values)
                         {
-                            List<double> outcomes = playerRollOutcomes[player][roll];
+                            List<double> outcomes = rollData.Results.Select(r => r.Value).ToList();
                             List<double> sortedOutcomes = outcomes.OrderBy(o => o).ToList();
 
                             double average = outcomes.Average();
                             double median = GetMedian(sortedOutcomes);
                             double mode = GetMode(sortedOutcomes);
                             int countOnes = outcomes.Count(o => o == 1);
-                            double maxRollValue = GetMaxRollValue(roll);
+                            double maxRollValue = GetMaxRollValue(rollData.DiceRollKey);
                             int countMax = outcomes.Count(o => o == maxRollValue);
                             int totalRolls = outcomes.Count;
 
-                            dgvRollStats.Rows.Add(player, roll, totalRolls, average, median, mode, countOnes, countMax);
+                            dgvRollStats.Rows.Add(player.PlayerName, rollData.DiceRollKey, totalRolls, average, median, mode, countOnes, countMax);
                         }
                     }
 
@@ -439,7 +546,79 @@ namespace Roll_stats
             catch (Exception ex)
             {
                 LogError(ex);
-                MessageBox.Show("An error occurred while updating the grid. Please check the error.log file for details.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show("An error occurred while updating the grid. Please check the error.log file for details.",
+                    "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void dgvRollStats_SelectionChanged(object sender, EventArgs e)
+        {
+            if (dgvRollStats.SelectedRows.Count > 0)
+            {
+                var selectedRow = dgvRollStats.SelectedRows[0];
+                string playerName = selectedRow.Cells["Player"].Value.ToString();
+                string diceRollKey = selectedRow.Cells["Roll"].Value.ToString();
+
+                UpdateRollReasonsGrid(playerName, diceRollKey);
+            }
+            else
+            {
+                // Clear the reasons grid if no row is selected
+                dgvRollReasons.Rows.Clear();
+                dgvRollReasons.Columns.Clear();
+            }
+        }
+
+        private void UpdateRollReasonsGrid(string playerName, string diceRollKey)
+        {
+            try
+            {
+                Invoke(new Action(() =>
+                {
+                    dgvRollReasons.SuspendLayout();
+                    dgvRollReasons.Rows.Clear();
+                    dgvRollReasons.Columns.Clear();
+
+                    dgvRollReasons.Columns.Add("Flavor", "Flavor");
+                    dgvRollReasons.Columns.Add("Total Rolls", "Total Rolls");
+                    dgvRollReasons.Columns.Add("Average", "Average");
+                    dgvRollReasons.Columns.Add("Median", "Median");
+                    dgvRollReasons.Columns.Add("Mode", "Mode");
+                    dgvRollReasons.Columns.Add("1s Rolled", "1s Rolled");
+                    dgvRollReasons.Columns.Add("Max Rolls", "Max Rolls");
+
+                    if (allPlayerRollOutcomes.TryGetValue(playerName, out PlayerData playerData))
+                    {
+                        if (playerData.RollDataByKey.TryGetValue(diceRollKey, out RollData rollData))
+                        {
+                            var flavorGroups = rollData.Results.GroupBy(r => r.Flavor);
+
+                            foreach (var flavorGroup in flavorGroups)
+                            {
+                                List<double> outcomes = flavorGroup.Select(r => r.Value).ToList();
+                                List<double> sortedOutcomes = outcomes.OrderBy(o => o).ToList();
+
+                                double average = outcomes.Average();
+                                double median = GetMedian(sortedOutcomes);
+                                double mode = GetMode(sortedOutcomes);
+                                int countOnes = outcomes.Count(o => o == 1);
+                                double maxRollValue = GetMaxRollValue(diceRollKey);
+                                int countMax = outcomes.Count(o => o == maxRollValue);
+                                int totalRolls = outcomes.Count;
+
+                                dgvRollReasons.Rows.Add(flavorGroup.Key, totalRolls, average, median, mode, countOnes, countMax);
+                            }
+                        }
+                    }
+
+                    dgvRollReasons.ResumeLayout();
+                }));
+            }
+            catch (Exception ex)
+            {
+                LogError(ex);
+                MessageBox.Show("An error occurred while updating the reasons grid. Please check the error.log file for details.",
+                    "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
@@ -485,15 +664,25 @@ namespace Roll_stats
         {
             try
             {
-                // Handling cases where roll may contain modifiers like "kh" or "kl"
-                var match = Regex.Match(roll, @"\d+d(\d+)");
+                // Match the roll pattern including number of dice and modifiers
+                var match = Regex.Match(roll, @"^(?<num>\d+)d(?<faces>\d+)(?<modifiers>.*)$");
                 if (match.Success)
                 {
-                    var rollValueStr = match.Groups[1].Value;
-                    if (double.TryParse(rollValueStr, NumberStyles.Any, CultureInfo.InvariantCulture, out double rollValue))
+                    int numDice = int.Parse(match.Groups["num"].Value);
+                    int faces = int.Parse(match.Groups["faces"].Value);
+                    string modifiers = match.Groups["modifiers"].Value;
+
+                    // Calculate maximum possible value considering modifiers
+                    double maxRollValue = numDice * faces;
+
+                    // Handle "kh" and "kl" modifiers
+                    if (modifiers.Contains("kh") || modifiers.Contains("kl"))
                     {
-                        return rollValue;
+                        // For simplicity, assume that "kh" or "kl" will keep one die
+                        maxRollValue = faces;
                     }
+
+                    return maxRollValue;
                 }
             }
             catch (Exception ex)
@@ -507,16 +696,8 @@ namespace Roll_stats
         {
             try
             {
-                if (chbDebug.Checked)
-                {
-                    lstSkippedRolls.Visible = true;
-                    lstInputRead.Visible = true;
-                }
-                else
-                {
-                    lstSkippedRolls.Visible = false;
-                    lstInputRead.Visible = false;
-                }
+                lstSkippedRolls.Visible = chbDebug.Checked;
+                lstInputRead.Visible = chbDebug.Checked;
             }
             catch (Exception ex)
             {

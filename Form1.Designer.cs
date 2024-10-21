@@ -40,7 +40,9 @@
             lblProgress = new Label();
             clbCharacters = new CheckedListBox();
             lblCharacters = new Label();
+            dgvRollReasons = new DataGridView();
             ((System.ComponentModel.ISupportInitialize)dgvRollStats).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)dgvRollReasons).BeginInit();
             SuspendLayout();
             // 
             // ofdInputFile
@@ -71,31 +73,31 @@
             dgvRollStats.Location = new Point(12, 41);
             dgvRollStats.Name = "dgvRollStats";
             dgvRollStats.RowHeadersWidth = 62;
-            dgvRollStats.Size = new Size(1115, 316);
+            dgvRollStats.Size = new Size(879, 316);
             dgvRollStats.TabIndex = 2;
             // 
             // lstInputRead
             // 
             lstInputRead.FormattingEnabled = true;
             lstInputRead.ItemHeight = 15;
-            lstInputRead.Location = new Point(12, 363);
+            lstInputRead.Location = new Point(897, 289);
             lstInputRead.Name = "lstInputRead";
-            lstInputRead.Size = new Size(381, 94);
+            lstInputRead.Size = new Size(230, 64);
             lstInputRead.TabIndex = 3;
             lstInputRead.Visible = false;
             // 
             // lstSkippedRolls
             // 
-            lstSkippedRolls.Location = new Point(399, 363);
+            lstSkippedRolls.Location = new Point(897, 41);
             lstSkippedRolls.Name = "lstSkippedRolls";
-            lstSkippedRolls.Size = new Size(725, 242);
+            lstSkippedRolls.Size = new Size(230, 242);
             lstSkippedRolls.TabIndex = 4;
             lstSkippedRolls.UseCompatibleStateImageBehavior = false;
             lstSkippedRolls.Visible = false;
             // 
             // pgbStatus
             // 
-            pgbStatus.Location = new Point(12, 463);
+            pgbStatus.Location = new Point(120, 363);
             pgbStatus.Name = "pgbStatus";
             pgbStatus.Size = new Size(381, 40);
             pgbStatus.TabIndex = 5;
@@ -114,11 +116,11 @@
             // lblProgress
             // 
             lblProgress.AutoSize = true;
-            lblProgress.Location = new Point(12, 506);
+            lblProgress.Location = new Point(12, 375);
             lblProgress.Name = "lblProgress";
-            lblProgress.Size = new Size(52, 15);
+            lblProgress.Size = new Size(105, 15);
             lblProgress.TabIndex = 7;
-            lblProgress.Text = "Progress";
+            lblProgress.Text = "File Read Progress:";
             // 
             // clbCharacters
             // 
@@ -139,11 +141,20 @@
             lblCharacters.TabIndex = 11;
             lblCharacters.Text = "Select from the list below!";
             // 
+            // dgvRollReasons
+            // 
+            dgvRollReasons.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize;
+            dgvRollReasons.Location = new Point(12, 409);
+            dgvRollReasons.Name = "dgvRollReasons";
+            dgvRollReasons.Size = new Size(1115, 194);
+            dgvRollReasons.TabIndex = 12;
+            // 
             // Form1
             // 
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
             ClientSize = new Size(1356, 617);
+            Controls.Add(dgvRollReasons);
             Controls.Add(lblCharacters);
             Controls.Add(clbCharacters);
             Controls.Add(lblProgress);
@@ -158,6 +169,7 @@
             Name = "Form1";
             Text = "Roll Stats!";
             ((System.ComponentModel.ISupportInitialize)dgvRollStats).EndInit();
+            ((System.ComponentModel.ISupportInitialize)dgvRollReasons).EndInit();
             ResumeLayout(false);
             PerformLayout();
         }
@@ -175,5 +187,6 @@
         private Label lblProgress;
         private CheckedListBox clbCharacters;
         private Label lblCharacters;
+        private DataGridView dgvRollReasons;
     }
 }

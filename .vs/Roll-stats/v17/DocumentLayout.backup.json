@@ -3,12 +3,16 @@
   "WorkspaceRootPath": "E:\\code_stuff\\roll-stats\\",
   "Documents": [
     {
+      "AbsoluteMoniker": "D:0:0:{CC2081BE-832D-411F-8793-9261D683DECE}|Roll-stats.csproj|e:\\code_stuff\\roll-stats\\form1.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}|Form",
+      "RelativeMoniker": "D:0:0:{CC2081BE-832D-411F-8793-9261D683DECE}|Roll-stats.csproj|solutionrelative:form1.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}|Form"
+    },
+    {
       "AbsoluteMoniker": "D:0:0:{CC2081BE-832D-411F-8793-9261D683DECE}|Roll-stats.csproj|e:\\code_stuff\\roll-stats\\form1.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
       "RelativeMoniker": "D:0:0:{CC2081BE-832D-411F-8793-9261D683DECE}|Roll-stats.csproj|solutionrelative:form1.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
-      "AbsoluteMoniker": "D:0:0:{CC2081BE-832D-411F-8793-9261D683DECE}|Roll-stats.csproj|e:\\code_stuff\\roll-stats\\form1.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}|Form",
-      "RelativeMoniker": "D:0:0:{CC2081BE-832D-411F-8793-9261D683DECE}|Roll-stats.csproj|solutionrelative:form1.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}|Form"
+      "AbsoluteMoniker": "D:0:0:{CC2081BE-832D-411F-8793-9261D683DECE}|Roll-stats.csproj|e:\\code_stuff\\roll-stats\\ldb-reader.js||{14D17961-FE51-464D-9111-C4AF11D7D99A}",
+      "RelativeMoniker": "D:0:0:{CC2081BE-832D-411F-8793-9261D683DECE}|Roll-stats.csproj|solutionrelative:ldb-reader.js||{14D17961-FE51-464D-9111-C4AF11D7D99A}"
     },
     {
       "AbsoluteMoniker": "D:0:0:{CC2081BE-832D-411F-8793-9261D683DECE}|Roll-stats.csproj|e:\\code_stuff\\roll-stats\\form1.designer.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
@@ -22,42 +26,55 @@
       "DocumentGroups": [
         {
           "DockedWidth": 200,
-          "SelectedChildIndex": 1,
+          "SelectedChildIndex": 0,
           "Children": [
             {
               "$type": "Document",
-              "DocumentIndex": 1,
+              "DocumentIndex": 0,
               "Title": "Form1.cs [Design]",
               "DocumentMoniker": "E:\\code_stuff\\roll-stats\\Form1.cs",
               "RelativeDocumentMoniker": "Form1.cs",
-              "ToolTip": "E:\\code_stuff\\roll-stats\\Form1.cs [Design]",
-              "RelativeToolTip": "Form1.cs [Design]",
+              "ToolTip": "E:\\code_stuff\\roll-stats\\Form1.cs [Design]*",
+              "RelativeToolTip": "Form1.cs [Design]*",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2024-10-18T02:33:07.075Z",
+              "WhenOpened": "2024-10-21T17:57:45.958Z",
               "EditorCaption": " [Design]"
             },
             {
               "$type": "Document",
-              "DocumentIndex": 0,
+              "DocumentIndex": 2,
+              "Title": "ldb-reader.js",
+              "DocumentMoniker": "E:\\code_stuff\\roll-stats\\ldb-reader.js",
+              "RelativeDocumentMoniker": "ldb-reader.js",
+              "ToolTip": "E:\\code_stuff\\roll-stats\\ldb-reader.js",
+              "RelativeToolTip": "ldb-reader.js",
+              "ViewState": "AgIAADgAAAAAAAAAAAAUwHMAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001646|",
+              "WhenOpened": "2024-10-21T07:32:59.922Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 1,
               "Title": "Form1.cs",
               "DocumentMoniker": "E:\\code_stuff\\roll-stats\\Form1.cs",
               "RelativeDocumentMoniker": "Form1.cs",
-              "ToolTip": "E:\\code_stuff\\roll-stats\\Form1.cs",
-              "RelativeToolTip": "Form1.cs",
-              "ViewState": "AgIAANABAAAAAAAAAAAgwA8CAAAAAAAAAAAAAA==",
+              "ToolTip": "E:\\code_stuff\\roll-stats\\Form1.cs*",
+              "RelativeToolTip": "Form1.cs*",
+              "ViewState": "AgIAAIcCAAAAAAAAAAAuwMQCAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2024-08-26T06:02:58.654Z",
               "EditorCaption": ""
             },
             {
               "$type": "Document",
-              "DocumentIndex": 2,
+              "DocumentIndex": 3,
               "Title": "Form1.Designer.cs",
               "DocumentMoniker": "E:\\code_stuff\\roll-stats\\Form1.Designer.cs",
               "RelativeDocumentMoniker": "Form1.Designer.cs",
-              "ToolTip": "E:\\code_stuff\\roll-stats\\Form1.Designer.cs",
-              "RelativeToolTip": "Form1.Designer.cs",
-              "ViewState": "AgIAAGIAAAAAAAAAAAAQwHoAAAAAAAAAAAAAAA==",
+              "ToolTip": "E:\\code_stuff\\roll-stats\\Form1.Designer.cs*",
+              "RelativeToolTip": "Form1.Designer.cs*",
+              "ViewState": "AgIAAFgAAAAAAAAAAAAwwEwAAAAmAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2024-08-26T06:03:11.536Z",
               "EditorCaption": ""
