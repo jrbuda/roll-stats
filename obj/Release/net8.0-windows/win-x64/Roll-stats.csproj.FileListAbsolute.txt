@@ -3,6 +3,7 @@ E:\code_stuff\roll-stats\bin\Release\net8.0-windows\win-x64\Roll-stats.deps.json
 E:\code_stuff\roll-stats\bin\Release\net8.0-windows\win-x64\Roll-stats.runtimeconfig.json
 E:\code_stuff\roll-stats\bin\Release\net8.0-windows\win-x64\Roll-stats.dll
 E:\code_stuff\roll-stats\bin\Release\net8.0-windows\win-x64\Roll-stats.pdb
+E:\code_stuff\roll-stats\bin\Release\net8.0-windows\win-x64\Newtonsoft.Json.dll
 E:\code_stuff\roll-stats\bin\Release\net8.0-windows\win-x64\Microsoft.CSharp.dll
 E:\code_stuff\roll-stats\bin\Release\net8.0-windows\win-x64\Microsoft.VisualBasic.Core.dll
 E:\code_stuff\roll-stats\bin\Release\net8.0-windows\win-x64\Microsoft.Win32.Primitives.dll
@@ -462,7 +463,9 @@ E:\code_stuff\roll-stats\bin\Release\net8.0-windows\win-x64\zh-Hant\UIAutomation
 E:\code_stuff\roll-stats\bin\Release\net8.0-windows\win-x64\zh-Hant\UIAutomationTypes.resources.dll
 E:\code_stuff\roll-stats\bin\Release\net8.0-windows\win-x64\zh-Hant\WindowsBase.resources.dll
 E:\code_stuff\roll-stats\bin\Release\net8.0-windows\win-x64\zh-Hant\WindowsFormsIntegration.resources.dll
+E:\code_stuff\roll-stats\obj\Release\net8.0-windows\win-x64\Roll-stats.csproj.AssemblyReference.cache
 E:\code_stuff\roll-stats\obj\Release\net8.0-windows\win-x64\Roll_stats.Form1.resources
+E:\code_stuff\roll-stats\obj\Release\net8.0-windows\win-x64\Roll_stats.Properties.Resources.resources
 E:\code_stuff\roll-stats\obj\Release\net8.0-windows\win-x64\Roll-stats.csproj.GenerateResource.cache
 E:\code_stuff\roll-stats\obj\Release\net8.0-windows\win-x64\Roll-stats.GeneratedMSBuildEditorConfig.editorconfig
 E:\code_stuff\roll-stats\obj\Release\net8.0-windows\win-x64\Roll-stats.AssemblyInfoInputs.cache

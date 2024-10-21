@@ -1,7 +1,0 @@
-E:\code_stuff\roll-stats\bin\Release\net8.0-windows\Publish\Roll-stats.pdb
-E:\code_stuff\roll-stats\bin\Release\net8.0-windows\Publish\D3DCompiler_47_cor3.dll
-E:\code_stuff\roll-stats\bin\Release\net8.0-windows\Publish\PenImc_cor3.dll
-E:\code_stuff\roll-stats\bin\Release\net8.0-windows\Publish\PresentationNative_cor3.dll
-E:\code_stuff\roll-stats\bin\Release\net8.0-windows\Publish\vcruntime140_cor3.dll
-E:\code_stuff\roll-stats\bin\Release\net8.0-windows\Publish\wpfgfx_cor3.dll
-E:\code_stuff\roll-stats\bin\Release\net8.0-windows\Publish\Roll-stats.exe

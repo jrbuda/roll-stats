@@ -7,7 +7,7 @@
       "RelativeMoniker": "D:0:0:{CC2081BE-832D-411F-8793-9261D683DECE}|Roll-stats.csproj|solutionrelative:form1.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
-      "AbsoluteMoniker": "D:0:0:{CC2081BE-832D-411F-8793-9261D683DECE}|Roll-stats.csproj|e:\\code_stuff\\roll-stats\\form1.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}|Form",
+      "AbsoluteMoniker": "D:0:0:{CC2081BE-832D-411F-8793-9261D683DECE}|Roll-stats.csproj|E:\\code_stuff\\roll-stats\\form1.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}|Form",
       "RelativeMoniker": "D:0:0:{CC2081BE-832D-411F-8793-9261D683DECE}|Roll-stats.csproj|solutionrelative:form1.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}|Form"
     },
     {
@@ -46,8 +46,8 @@
               "Title": "Form1.cs [Design]",
               "DocumentMoniker": "E:\\code_stuff\\roll-stats\\Form1.cs",
               "RelativeDocumentMoniker": "Form1.cs",
-              "ToolTip": "E:\\code_stuff\\roll-stats\\Form1.cs [Design]*",
-              "RelativeToolTip": "Form1.cs [Design]*",
+              "ToolTip": "E:\\code_stuff\\roll-stats\\Form1.cs [Design]",
+              "RelativeToolTip": "Form1.cs [Design]",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2024-10-21T20:24:14.162Z",
               "EditorCaption": " [Design]"
@@ -62,7 +62,8 @@
               "RelativeToolTip": "PlayerData.cs",
               "ViewState": "AgIAAAAAAAAAAAAAAAAAABQAAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2024-10-21T20:14:44.589Z"
+              "WhenOpened": "2024-10-21T20:14:44.589Z",
+              "EditorCaption": ""
             },
             {
               "$type": "Document",
@@ -74,7 +75,8 @@
               "RelativeToolTip": "RollData.cs",
               "ViewState": "AgIAAAAAAAAAAAAAAAAAABQAAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2024-10-21T20:14:38.57Z"
+              "WhenOpened": "2024-10-21T20:14:38.57Z",
+              "EditorCaption": ""
             },
             {
               "$type": "Document",
@@ -86,7 +88,8 @@
               "RelativeToolTip": "RollResult.cs",
               "ViewState": "AgIAAAAAAAAAAAAAAAAAACEAAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2024-10-21T20:14:31.349Z"
+              "WhenOpened": "2024-10-21T20:14:31.349Z",
+              "EditorCaption": ""
             },
             {
               "$type": "Document",
@@ -106,8 +109,8 @@
               "Title": "Form1.cs",
               "DocumentMoniker": "E:\\code_stuff\\roll-stats\\Form1.cs",
               "RelativeDocumentMoniker": "Form1.cs",
-              "ToolTip": "E:\\code_stuff\\roll-stats\\Form1.cs*",
-              "RelativeToolTip": "Form1.cs*",
+              "ToolTip": "E:\\code_stuff\\roll-stats\\Form1.cs",
+              "RelativeToolTip": "Form1.cs",
               "ViewState": "AgIAAOEBAAAAAAAAAAApwP0BAAAzAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2024-08-26T06:02:58.654Z",
@@ -123,8 +126,7 @@
               "RelativeToolTip": "Form1.Designer.cs",
               "ViewState": "AgIAAKAAAAAAAAAAAAAwwMAAAAA6AAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2024-08-26T06:03:11.536Z",
-              "EditorCaption": ""
+              "WhenOpened": "2024-08-26T06:03:11.536Z"
             }
           ]
         }

@@ -1,0 +1,7 @@
+E:\code_stuff\roll-stats-publish\Roll-stats.pdb
+E:\code_stuff\roll-stats-publish\D3DCompiler_47_cor3.dll
+E:\code_stuff\roll-stats-publish\PenImc_cor3.dll
+E:\code_stuff\roll-stats-publish\PresentationNative_cor3.dll
+E:\code_stuff\roll-stats-publish\vcruntime140_cor3.dll
+E:\code_stuff\roll-stats-publish\wpfgfx_cor3.dll
+E:\code_stuff\roll-stats-publish\Roll-stats.exe
