@@ -65,3 +65,10 @@ If you encounter any issues or have suggestions, please open an issue on the Git
 ### Acknowledgments
 
 Special thanks to the FoundryVTT community for inspiring this project and providing valuable feedback.
+
+## Known Issues / Upcoming Fixes
+
+- Better instructions on how to merge characters.
+- Newly merged characters should **not** be auto-selected, allowing users to merge more characters without additional clicks.
+- Provide better information for the debug option and automatically redirect to the details tab instead of the results tab when debugging.
+- The dialog box asking if you want to use `output.txt` is deprecated and needs to be removed.
