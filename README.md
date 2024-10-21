@@ -12,7 +12,7 @@ Welcome to **Roll Stats**, a utility for breaking down and analyzing FoundryVTT 
 
 1. Download the `roll-stats-AllInOne.zip` file from the repository and unzip it.
 
-2. Install the required dependencies:
+2. Enter the newly created folder and install the required dependencies:
    ```bash
    npm install
    ```
