@@ -44,6 +44,7 @@ After running Roll Stats, you will receive a report that includes:
 - Breakdown of rolls by player.
 - Frequency of natural 1s and 20s.
 - Average rolls and critical success rates.
+![image](https://github.com/user-attachments/assets/9e2b764a-571f-4c02-9cea-062bb9ae55fd)
 
 This makes it easier for you to analyze gameplay behavior and ensure everyone has a fair and enjoyable experience.
 
