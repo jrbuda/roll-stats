@@ -1,54 +1,72 @@
 using System;
 using System.Collections.Generic;
-using System.Globalization;
+using System.Diagnostics; // For Process class
 using System.IO;
 using System.Linq;
+using System.Text;
 using System.Text.RegularExpressions;
-using System.Threading.Tasks;
+using System.Threading.Tasks; // For Task.Run
 using System.Windows.Forms;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+using Microsoft.VisualBasic; // For InputBox
 
 namespace Roll_stats
 {
     public partial class Form1 : Form
     {
-        private const string ChunkDelimiter = "---------------------------";
-        private static readonly Regex rollLineRegex = new Regex(
-            @"^(?<rollExpr>.+?)\s*=\s*(?<outcomes>.+?)\s*=\s*(?<total>.+)$",
-            RegexOptions.Compiled);
-
-        // Class-level variable to store all stats
-        private Dictionary<string, Dictionary<string, List<double>>> allPlayerRollOutcomes = new Dictionary<string, Dictionary<string, List<double>>>();
+        /// <summary>
+        /// A dictionary storing all player roll outcomes, keyed by player name.
+        /// </summary>
+        private Dictionary<string, PlayerData> allPlayerRollOutcomes = new Dictionary<string, PlayerData>();
 
         public Form1()
         {
             InitializeComponent();
-            // Subscribe to the ItemCheck event
-            clbCharacters.ItemCheck += clbCharacters_ItemCheck;
-            // Hide debug lists initially
-            lstSkippedRolls.Visible = false;
-            lstInputRead.Visible = false;
 
-            // Set up global exception handlers
+            // Assign event handlers to controls
+            chbDebug.CheckedChanged += chbDebug_CheckedChanged;
+            toolStripButtonGetInputFile.Click += btnGetInputFile_Click;
+            toolStripButtonReset.Click += toolStripButtonReset_Click;
+
+            // Set DataGridView properties
+            dgvRollStats.ClipboardCopyMode = DataGridViewClipboardCopyMode.EnableAlwaysIncludeHeaderText;
+
+            // Handle unhandled exceptions
             Application.ThreadException += Application_ThreadException;
             AppDomain.CurrentDomain.UnhandledException += CurrentDomain_UnhandledException;
+
+            // Initialize status bar
+            toolStripStatusLabel.Text = "Ready";
+            toolStripProgressBar.Value = 0;
         }
 
-        // Global exception handler for UI thread exceptions
+        #region Error Handling
+
+        /// <summary>
+        /// Handles unhandled thread exceptions.
+        /// </summary>
         private void Application_ThreadException(object sender, System.Threading.ThreadExceptionEventArgs e)
         {
             LogError(e.Exception);
-            MessageBox.Show("An unexpected error occurred. Please check the error.log file for details.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            MessageBox.Show("An unexpected error occurred. Please check the error.log file for details.",
+                "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
 
-        // Global exception handler for non-UI thread exceptions
+        /// <summary>
+        /// Handles unhandled domain exceptions.
+        /// </summary>
         private void CurrentDomain_UnhandledException(object sender, UnhandledExceptionEventArgs e)
         {
             Exception ex = e.ExceptionObject as Exception;
             LogError(ex);
-            MessageBox.Show("A critical error occurred. Please check the error.log file for details.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            MessageBox.Show("A critical error occurred. Please check the error.log file for details.",
+                "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
 
-        // Method to log errors to error.log file
+        /// <summary>
+        /// Logs exceptions to a file.
+        /// </summary>
         private void LogError(Exception ex)
         {
             try
@@ -59,54 +77,214 @@ namespace Roll_stats
             }
             catch
             {
-                // If logging fails, there's not much we can do
+                // Ignored
             }
         }
 
+        #endregion
+
+        #region Input File Processing
+
+        /// <summary>
+        /// Handles the click event for the "Get Input File" button.
+        /// </summary>
         private async void btnGetInputFile_Click(object sender, EventArgs e)
         {
             try
             {
-                using (OpenFileDialog openFileDialog = new OpenFileDialog())
+                // Ask the user to choose between LevelDB directory or output.txt file
+                DialogResult result = MessageBox.Show(
+                    "Do you want to select a LevelDB directory?\n\nClick Yes to select a LevelDB directory.\nClick No to select an existing output.txt file.",
+                    "Select Input Type", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Question);
+
+                if (result == DialogResult.Yes)
                 {
-                    openFileDialog.InitialDirectory = "e:\\";
-                    openFileDialog.Filter = "All files (*.*)|*.*|Text files (*.txt)|*.txt";
-                    openFileDialog.FilterIndex = 1;
-                    openFileDialog.RestoreDirectory = true;
-
-                    if (openFileDialog.ShowDialog() == DialogResult.OK)
+                    // User wants to select LevelDB directory
+                    using (FolderBrowserDialog folderBrowserDialog = new FolderBrowserDialog())
                     {
-                        txtInputFile.Text = openFileDialog.FileName;
-
-                        // Clear previous data and disable controls during parsing
-                        Invoke(new Action(() =>
+                        folderBrowserDialog.Description = "Select the FoundryVTT 'messages' LevelDB directory";
+                        if (folderBrowserDialog.ShowDialog() == DialogResult.OK)
                         {
-                            clbCharacters.Items.Clear();
-                            dgvRollStats.Rows.Clear();
-                            lstSkippedRolls.Items.Clear();
-                            lstInputRead.Items.Clear();
-                            clbCharacters.Enabled = false;
-                            pgbStatus.Value = 0;
-                        }));
+                            string dbPath = folderBrowserDialog.SelectedPath;
+                            txtInputFile.Text = dbPath;
 
-                        // Parse the file to extract character names and stats
-                        await Task.Run(() => ParseFileAndExtractStats(openFileDialog.FileName));
+                            // Reset UI and disable controls
+                            Invoke(new Action(() =>
+                            {
+                                ResetUI();
+                                clbCharacters.Enabled = false;
+                                toolStripStatusLabel.Text = "Processing...";
+                            }));
 
-                        // Enable controls after parsing
-                        Invoke(new Action(() =>
-                        {
-                            clbCharacters.Enabled = true;
-                        }));
+                            // Run processing in a background task
+                            await Task.Run(() => RunNodeScriptAndParseData(dbPath));
+
+                            // Re-enable controls and update UI
+                            Invoke(new Action(() =>
+                            {
+                                clbCharacters.Enabled = true;
+                                toolStripProgressBar.Value = 100; // Ensure progress bar reaches 100%
+                                toolStripStatusLabel.Text = "Completed";
+
+                                // Redirect to Roll Statistics tab
+                                tabControl.SelectedTab = tabRollStatistics;
+                            }));
+                        }
                     }
+                }
+                else if (result == DialogResult.No)
+                {
+                    // User wants to select output.txt file
+                    using (OpenFileDialog openFileDialog = new OpenFileDialog())
+                    {
+                        openFileDialog.InitialDirectory = "e:\\";
+                        openFileDialog.Filter = "Text files (*.txt)|*.txt|All files (*.*)|*.*";
+                        openFileDialog.FilterIndex = 1;
+                        openFileDialog.RestoreDirectory = true;
+
+                        if (openFileDialog.ShowDialog() == DialogResult.OK)
+                        {
+                            string outputFilePath = openFileDialog.FileName;
+                            txtInputFile.Text = outputFilePath;
+
+                            // Reset UI and disable controls
+                            Invoke(new Action(() =>
+                            {
+                                ResetUI();
+                                clbCharacters.Enabled = false;
+                                toolStripStatusLabel.Text = "Processing...";
+                            }));
+
+                            // Run processing in a background task
+                            await Task.Run(() => ParseFileAndExtractStats(outputFilePath));
+
+                            // Re-enable controls and update UI
+                            Invoke(new Action(() =>
+                            {
+                                clbCharacters.Enabled = true;
+                                toolStripProgressBar.Value = 100; // Ensure progress bar reaches 100%
+                                toolStripStatusLabel.Text = "Completed";
+
+                                // Redirect to Roll Statistics tab
+                                tabControl.SelectedTab = tabRollStatistics;
+                            }));
+                        }
+                    }
+                }
+                else
+                {
+                    // User canceled the operation
                 }
             }
             catch (Exception ex)
             {
                 LogError(ex);
-                MessageBox.Show("An error occurred while opening the file. Please check the error.log file for details.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show("An error occurred while selecting the input. Please check the error.log file for details.",
+                    "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
+        /// <summary>
+        /// Resets the UI elements to their default state.
+        /// </summary>
+        private void ResetUI()
+        {
+            clbCharacters.Items.Clear();
+            dgvRollStats.Rows.Clear();
+            dgvRollReasons.Rows.Clear();
+            lstSkippedRolls.Items.Clear();
+            lstInputRead.Items.Clear();
+            toolStripProgressBar.Value = 0;
+            toolStripStatusLabel.Text = "Ready";
+            txtInputFile.Text = string.Empty;
+        }
+
+        /// <summary>
+        /// Handles the click event for the "Reset" button.
+        /// </summary>
+        private void toolStripButtonReset_Click(object sender, EventArgs e)
+        {
+            // Clear all controls and reset the form
+            ResetUI();
+        }
+
+        /// <summary>
+        /// Runs the Node.js script to read LevelDB data and parses the output.
+        /// </summary>
+        private void RunNodeScriptAndParseData(string dbPath)
+        {
+            try
+            {
+                // Path to your Node.js script in the same directory as the executable
+                string nodeScriptPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "ldb-reader.js");
+
+                // Check if the script exists
+                if (!File.Exists(nodeScriptPath))
+                {
+                    throw new FileNotFoundException("Node.js script file not found in the application directory.", nodeScriptPath);
+                }
+
+                // Define the output file path in the same directory
+                string outputFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "output.txt");
+
+                // Build the arguments to pass to the script
+                string args = $"\"{nodeScriptPath}\" \"{dbPath}\" \"{outputFilePath}\"";
+
+                // Start the Node.js process
+                ProcessStartInfo startInfo = new ProcessStartInfo
+                {
+                    FileName = "node",
+                    Arguments = args,
+                    UseShellExecute = false,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    CreateNoWindow = true
+                };
+
+                using (Process process = new Process { StartInfo = startInfo })
+                {
+                    // Event handlers for output and error data
+                    process.OutputDataReceived += (sender, e) =>
+                    {
+                        if (!string.IsNullOrEmpty(e.Data))
+                        {
+                            // Optionally handle standard output
+                        }
+                    };
+                    process.ErrorDataReceived += (sender, e) =>
+                    {
+                        if (!string.IsNullOrEmpty(e.Data))
+                        {
+                            LogError(new Exception(e.Data));
+                        }
+                    };
+
+                    process.Start();
+                    process.BeginOutputReadLine();
+                    process.BeginErrorReadLine();
+
+                    process.WaitForExit();
+
+                    if (process.ExitCode != 0)
+                    {
+                        throw new Exception("Node.js script exited with a non-zero exit code.");
+                    }
+                }
+
+                // After the Node.js script has finished, parse the output.txt file
+                ParseFileAndExtractStats(outputFilePath);
+            }
+            catch (Exception ex)
+            {
+                LogError(ex);
+                MessageBox.Show("An error occurred while running the Node.js script. Please check the error.log file for details.",
+                    "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        /// <summary>
+        /// Parses the output file and extracts roll statistics.
+        /// </summary>
         private void ParseFileAndExtractStats(string inputFilepath)
         {
             try
@@ -115,104 +293,257 @@ namespace Roll_stats
                 List<string> skippedLines = isDebug ? new List<string>() : null;
                 List<string> inputReadItems = isDebug ? new List<string>() : null;
 
-                int totalLines = File.ReadLines(inputFilepath).Count();
-                int linesProcessed = 0;
-                int currentLineNumber = 0;
-                int lastProgress = 0;
+                allPlayerRollOutcomes = new Dictionary<string, PlayerData>();
 
-                allPlayerRollOutcomes = new Dictionary<string, Dictionary<string, List<double>>>();
+                // Read all lines into a list
+                List<string> lines = File.ReadAllLines(inputFilepath).ToList();
+                long totalLines = lines.Count;
+                long currentLine = 0;
 
-                using (var reader = new StreamReader(inputFilepath))
+                while (currentLine < totalLines)
                 {
-                    List<string> chunkLines = new List<string>();
-                    string currentLine;
+                    string line = lines[(int)currentLine].Trim();
 
-                    while ((currentLine = reader.ReadLine()) != null)
+                    if (string.IsNullOrWhiteSpace(line))
                     {
-                        currentLineNumber++;
-
-                        currentLine = currentLine.Trim();
-                        linesProcessed++;
-
-                        if (currentLine == ChunkDelimiter)
-                        {
-                            ProcessChunk(chunkLines, allPlayerRollOutcomes, isDebug, skippedLines, inputReadItems, currentLineNumber - chunkLines.Count);
-                            chunkLines.Clear();
-                        }
-                        else
-                        {
-                            chunkLines.Add(currentLine);
-                        }
-
-                        // Update progress bar
-                        int progress = (int)((double)linesProcessed / totalLines * 100);
-                        if (progress > lastProgress)
-                        {
-                            lastProgress = progress;
-                            Invoke(new Action(() => pgbStatus.Value = progress));
-                        }
+                        currentLine++;
+                        continue; // Skip empty lines
                     }
 
-                    // Process any remaining chunk
-                    if (chunkLines.Count > 0)
+                    if (line.StartsWith("Key:"))
                     {
-                        ProcessChunk(chunkLines, allPlayerRollOutcomes, isDebug, skippedLines, inputReadItems, currentLineNumber - chunkLines.Count);
+                        currentLine++; // Move to "Value:" line
+                        if (currentLine >= totalLines)
+                        {
+                            if (isDebug && skippedLines != null)
+                            {
+                                skippedLines.Add($"Unexpected end of file after 'Key:' at line {currentLine}");
+                            }
+                            break;
+                        }
+
+                        line = lines[(int)currentLine].Trim();
+                        if (!line.StartsWith("Value:"))
+                        {
+                            if (isDebug && skippedLines != null)
+                            {
+                                skippedLines.Add($"Expected 'Value:' after 'Key:' at line {currentLine}");
+                            }
+                            continue;
+                        }
+
+                        currentLine++; // Move to JSON lines
+                        StringBuilder jsonBuilder = new StringBuilder();
+                        int braceCount = 0;
+                        bool jsonStarted = false;
+
+                        while (currentLine < totalLines)
+                        {
+                            line = lines[(int)currentLine];
+
+                            if (string.IsNullOrWhiteSpace(line))
+                            {
+                                currentLine++;
+                                continue; // Skip empty lines
+                            }
+
+                            jsonBuilder.AppendLine(line);
+
+                            // Count braces to detect end of JSON object
+                            braceCount += line.Count(c => c == '{');
+                            braceCount -= line.Count(c => c == '}');
+
+                            if (line.Contains("{"))
+                            {
+                                jsonStarted = true;
+                            }
+
+                            currentLine++;
+
+                            if (jsonStarted && braceCount == 0)
+                            {
+                                // JSON object is complete
+                                break;
+                            }
+                        }
+
+                        string json = jsonBuilder.ToString();
+                        if (!string.IsNullOrWhiteSpace(json) && IsValidJson(json))
+                        {
+                            // Process the JSON
+                            ProcessJson(json, isDebug, skippedLines, inputReadItems);
+                        }
+                        else if (isDebug && skippedLines != null)
+                        {
+                            skippedLines.Add($"Invalid JSON format starting at line {currentLine}");
+                        }
                     }
+                    else
+                    {
+                        if (isDebug && skippedLines != null)
+                        {
+                            skippedLines.Add($"Skipped non-JSON line: {line}");
+                        }
+                        currentLine++;
+                    }
+
+                    // Update progress bar
+                    int progress = (int)(((double)currentLine / totalLines) * 100);
+                    Invoke(new Action(() =>
+                    {
+                        toolStripProgressBar.Value = progress;
+                        toolStripStatusLabel.Text = $"Processing... {progress}%";
+                    }));
                 }
 
-                // Update the clbCharacters with the character names
                 var characterNames = new HashSet<string>(allPlayerRollOutcomes.Keys);
 
-                // Update UI elements on the main thread
+                // Update the character list on the UI
                 Invoke(new Action(() =>
                 {
                     clbCharacters.Items.Clear();
                     clbCharacters.Items.AddRange(characterNames.OrderBy(n => n).ToArray());
                 }));
 
-                // Update debug lists if debugging is enabled
                 if (isDebug)
                 {
                     Invoke(new Action(() =>
                     {
+                        lstSkippedRolls.Items.Clear();
+                        lstInputRead.Items.Clear();
+
                         lstSkippedRolls.Items.AddRange(skippedLines.Select(line => new ListViewItem(line)).ToArray());
-                        lstInputRead.Items.AddRange(inputReadItems.Select(item => new ListViewItem(item)).ToArray());
+                        lstInputRead.Items.AddRange(inputReadItems.ToArray());
                     }));
                 }
             }
             catch (Exception ex)
             {
                 LogError(ex);
-                MessageBox.Show("An error occurred while parsing the file. Please check the error.log file for details.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show("An error occurred while parsing the file. Please check the error.log file for details.",
+                    "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
-        private void ProcessChunk(List<string> chunkLines, Dictionary<string, Dictionary<string, List<double>>> playerRollOutcomes, bool isDebug, List<string> skippedLines = null, List<string> inputReadItems = null, int startingLineNumber = 0)
+        /// <summary>
+        /// Processes a JSON string to extract roll data.
+        /// </summary>
+        private void ProcessJson(string json, bool isDebug, List<string> skippedLines, List<string> inputReadItems)
         {
             try
             {
-                if (chunkLines.Count == 0) return;
+                JObject parsedJson = JObject.Parse(json);
 
-                string name = ExtractPlayerName(chunkLines[0]);
-
-                if (string.IsNullOrEmpty(name))
+                // Extract player name
+                string playerName = null;
+                if (parsedJson.TryGetValue("speaker", out JToken speakerToken))
                 {
-                    return; // Skip processing if name is empty
-                }
-
-                if (!playerRollOutcomes.TryGetValue(name, out var playerRolls))
-                {
-                    playerRolls = new Dictionary<string, List<double>>();
-                    playerRollOutcomes[name] = playerRolls;
-                }
-
-                for (int i = 0; i < chunkLines.Count; i++)
-                {
-                    if (!ParseRollLine(chunkLines[i], playerRolls, isDebug, startingLineNumber + i, skippedLines, inputReadItems))
+                    if (speakerToken.Type == JTokenType.Object)
                     {
-                        if (isDebug && skippedLines != null)
+                        playerName = speakerToken["alias"]?.ToString()?.ToLower();
+                    }
+                    else
+                    {
+                        // Skip entries where 'speaker' is not an object
+                        return;
+                    }
+                }
+                else
+                {
+                    // Skip entries without 'speaker'
+                    return;
+                }
+
+                if (string.IsNullOrEmpty(playerName))
+                {
+                    // Skip entries with missing alias
+                    return;
+                }
+
+                if (!allPlayerRollOutcomes.TryGetValue(playerName, out PlayerData playerData))
+                {
+                    playerData = new PlayerData { PlayerName = playerName };
+                    allPlayerRollOutcomes[playerName] = playerData;
+                }
+
+                JArray rolls = parsedJson["rolls"] as JArray;
+                if (rolls != null)
+                {
+                    foreach (var roll in rolls)
+                    {
+                        string flavor = roll["options"]?["flavor"]?.ToString() ?? "Unknown";
+
+                        JArray terms = roll["terms"] as JArray;
+                        if (terms == null) continue;
+
+                        double dieRollSum = 0;
+                        double modifierSum = 0;
+
+                        foreach (var term in terms)
                         {
-                            skippedLines.Add($"{chunkLines[i]}\nSkipped at line {startingLineNumber + i}");
+                            string termClass = term["class"]?.ToString();
+
+                            if (termClass == "Die")
+                            {
+                                JArray results = term["results"] as JArray;
+                                if (results == null) continue;
+
+                                foreach (var result in results)
+                                {
+                                    if (result["active"]?.ToObject<bool>() == true)
+                                    {
+                                        double rollResult = result["result"]?.ToObject<double>() ?? 0;
+                                        dieRollSum += rollResult;
+                                    }
+                                }
+                            }
+                            else if (termClass == "NumericTerm" && term["evaluated"]?.ToObject<bool>() == true)
+                            {
+                                double modifierValue = term["number"]?.ToObject<double>() ?? 0;
+                                modifierSum += modifierValue;
+                            }
+                            // Handle other term types if necessary
+                        }
+
+                        double totalValue = roll["total"]?.ToObject<double>() ?? dieRollSum + modifierSum;
+
+                        // Extract the full formula
+                        string fullFormula = roll["formula"]?.ToString() ?? "Unknown";
+
+                        // Extract the base roll
+                        string diceRollKey = ExtractBaseRoll(fullFormula);
+
+                        if (string.IsNullOrWhiteSpace(diceRollKey))
+                        {
+                            // Log and skip if diceRollKey is empty
+                            LogError(new Exception($"ProcessJson: diceRollKey is null or empty for formula '{fullFormula}'."));
+                            continue;
+                        }
+
+                        // Use full formula as the roll sub-key (includes modifiers)
+                        string rollSubKey = fullFormula;
+
+                        if (!playerData.RollDataByKey.TryGetValue(diceRollKey, out RollData rollData))
+                        {
+                            rollData = new RollData { DiceRollKey = diceRollKey };
+                            playerData.RollDataByKey[diceRollKey] = rollData;
+                        }
+
+                        // Create a new RollResult with the extracted values
+                        var rollResultObj = new RollResult
+                        {
+                            Flavor = flavor,
+                            DieRollValue = dieRollSum,
+                            ModifierValue = modifierSum,
+                            TotalValue = totalValue,
+                            FullFormula = fullFormula
+                        };
+
+                        rollData.Results.Add(rollResultObj);
+
+                        if (isDebug && inputReadItems != null)
+                        {
+                            inputReadItems.Add($"{playerName}: {fullFormula} ({flavor}) rolled {dieRollSum} + {modifierSum} = {totalValue}");
                         }
                     }
                 }
@@ -222,139 +553,80 @@ namespace Roll_stats
                 LogError(ex);
                 if (isDebug && skippedLines != null)
                 {
-                    skippedLines.Add($"Error processing chunk starting at line {startingLineNumber}: {ex.Message}");
+                    skippedLines.Add($"Error parsing JSON: {ex.Message}");
                 }
             }
         }
 
-        private string ExtractPlayerName(string line)
+        /// <summary>
+        /// Extracts the base roll (dice expression) from a formula by removing modifiers.
+        /// </summary>
+        private string ExtractBaseRoll(string formula)
         {
-            try
+            if (string.IsNullOrWhiteSpace(formula))
             {
-                int index = line.LastIndexOf("]");
-                if (index != -1 && index + 1 < line.Length)
-                {
-                    return line.Substring(index + 1).Trim().ToLower();
-                }
+                // Return null if formula is null or empty
+                return null;
             }
-            catch (Exception ex)
+
+            // Remove any whitespaces
+            formula = formula.Replace(" ", "");
+
+            // Regular expression to match dice expressions
+            var dicePattern = @"\b(?:max\(0,)?(?<num>\d*)d(?<faces>\d+)(?<keep>k(?:h|l|\d+))?\)?\b";
+            var matches = Regex.Matches(formula, dicePattern);
+
+            if (matches.Count == 0)
             {
-                LogError(ex);
+                // Return null if no dice expressions are found
+                return null;
             }
-            return string.Empty;
+
+            // Combine all matched dice expressions to form the base roll key
+            var baseRoll = string.Join(" + ", matches.Cast<Match>().Select(m => m.Value));
+            return baseRoll;
         }
 
-        private bool ParseRollLine(string line, Dictionary<string, List<double>> playerRolls, bool isDebug, int lineNumber, List<string> skippedLines = null, List<string> inputReadItems = null)
+
+        /// <summary>
+        /// Checks if a string is valid JSON.
+        /// </summary>
+        private bool IsValidJson(string strInput)
         {
-            try
+            if (string.IsNullOrWhiteSpace(strInput)) { return false; }
+            strInput = strInput.Trim();
+            if ((strInput.StartsWith("{") && strInput.EndsWith("}")) || // For object
+                (strInput.StartsWith("[") && strInput.EndsWith("]")))   // For array
             {
-                line = line.Trim();
-
-                // Simplified regex to capture the roll expression and outcomes
-                var pattern = @"^(?<rollExpr>.+?)\s*=\s*(?<outcomes>.+?)\s*=\s*(?<total>.+)$";
-                var match = Regex.Match(line, pattern);
-                if (!match.Success)
+                try
                 {
-                    if (isDebug && skippedLines != null)
-                    {
-                        skippedLines.Add($"{line}\nInvalid format at line {lineNumber}");
-                    }
-                    return false;
-                }
-
-                var rollExpr = match.Groups["rollExpr"].Value.Trim();       // e.g., "1d8"
-                var outcomesStr = match.Groups["outcomes"].Value.Trim();    // e.g., "4"
-
-                // Extract dice rolls from the roll expression
-                var diceRollMatches = Regex.Matches(rollExpr, @"\b\d+d\d+(?:kh\d*|kl\d*)?\b");
-                var diceRolls = diceRollMatches.Cast<Match>().Select(m => m.Value).ToList();
-
-                // Extract numbers from the outcomes expression
-                var outcomeMatches = Regex.Matches(outcomesStr, @"-?\d+(\.\d+)?");
-                var outcomeValues = outcomeMatches.Cast<Match>().Select(m => m.Value).ToList();
-
-                if (diceRolls.Count == 1 && outcomeValues.Count == 1)
-                {
-                    // Handle the case where there's a single roll and a single outcome
-                    var diceRoll = diceRolls[0];
-                    var outcomeStr = outcomeValues[0];
-
-                    if (!double.TryParse(outcomeStr, NumberStyles.Any, CultureInfo.InvariantCulture, out double outcome))
-                    {
-                        if (isDebug && skippedLines != null)
-                        {
-                            skippedLines.Add($"Invalid outcome value at line {lineNumber}: {outcomeStr} in line: {line}");
-                        }
-                        return false;
-                    }
-
-                    if (!playerRolls.ContainsKey(diceRoll))
-                    {
-                        playerRolls[diceRoll] = new List<double>();
-                    }
-                    playerRolls[diceRoll].Add(outcome);
-
-                    if (isDebug && inputReadItems != null)
-                    {
-                        inputReadItems.Add($"{diceRoll}: Outcome: {outcome}");
-                    }
-
+                    var obj = JToken.Parse(strInput);
                     return true;
                 }
-
-                if (diceRolls.Count > outcomeValues.Count)
+                catch (JsonReaderException)
                 {
-                    if (isDebug && skippedLines != null)
-                    {
-                        skippedLines.Add($"Not enough outcomes for dice rolls at line {lineNumber}: {line}");
-                    }
                     return false;
                 }
-
-                // Process each dice roll and corresponding outcome
-                for (int i = 0; i < diceRolls.Count; i++)
+                catch (Exception)
                 {
-                    var diceRoll = diceRolls[i];
-                    var outcomeStr = outcomeValues[i];
-
-                    if (!double.TryParse(outcomeStr, NumberStyles.Any, CultureInfo.InvariantCulture, out double outcome))
-                    {
-                        if (isDebug && skippedLines != null)
-                        {
-                            skippedLines.Add($"Invalid outcome value at line {lineNumber}: {outcomeStr} in line: {line}");
-                        }
-                        return false;
-                    }
-
-                    if (!playerRolls.ContainsKey(diceRoll))
-                    {
-                        playerRolls[diceRoll] = new List<double>();
-                    }
-                    playerRolls[diceRoll].Add(outcome);
-
-                    if (isDebug && inputReadItems != null)
-                    {
-                        inputReadItems.Add($"{diceRoll}: Outcome: {outcome}");
-                    }
+                    return false;
                 }
-
-                return true;
             }
-            catch (Exception ex)
-            {
-                LogError(ex);
-                if (isDebug && skippedLines != null)
-                {
-                    skippedLines.Add($"Error parsing roll line at line {lineNumber}: {ex.Message}");
-                }
-                return false;
-            }
+            return false;
         }
 
+        #endregion
+
+        #region Character Selection and Merging
+
+        /// <summary>
+        /// Handles the ItemCheck event for the character checklist, updating the roll stats grid.
+        /// </summary>
         private void clbCharacters_ItemCheck(object sender, ItemCheckEventArgs e)
         {
-            // Schedule the update after the event handler completes
-            this.BeginInvoke((MethodInvoker)delegate {
+            // Use BeginInvoke to ensure the ItemCheck event completes before updating
+            this.BeginInvoke((MethodInvoker)delegate
+            {
                 try
                 {
                     UpdateRollStatsGridForSelectedCharacters();
@@ -362,39 +634,163 @@ namespace Roll_stats
                 catch (Exception ex)
                 {
                     LogError(ex);
-                    MessageBox.Show("An error occurred while updating the stats. Please check the error.log file for details.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    MessageBox.Show("An error occurred while updating the stats. Please check the error.log file for details.",
+                        "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 }
             });
         }
 
+        /// <summary>
+        /// Updates the roll stats grid based on the selected characters.
+        /// </summary>
         private void UpdateRollStatsGridForSelectedCharacters()
         {
             try
             {
                 var selectedCharacters = clbCharacters.CheckedItems.Cast<string>().ToList();
-
-                // Prepare data to display
-                var displayData = new Dictionary<string, Dictionary<string, List<double>>>();
+                var displayData = new Dictionary<string, PlayerData>();
 
                 foreach (var character in selectedCharacters)
                 {
-                    if (allPlayerRollOutcomes.TryGetValue(character, out var playerRolls))
+                    if (allPlayerRollOutcomes.TryGetValue(character, out PlayerData playerData))
                     {
-                        displayData[character] = playerRolls;
+                        displayData[character] = playerData;
                     }
                 }
 
-                // Now update the DataGridView with displayData
                 UpdateRollStatsGrid(displayData);
             }
             catch (Exception ex)
             {
                 LogError(ex);
-                MessageBox.Show("An error occurred while preparing the data for display. Please check the error.log file for details.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show("An error occurred while preparing the data for display. Please check the error.log file for details.",
+                    "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
-        private void UpdateRollStatsGrid(Dictionary<string, Dictionary<string, List<double>>> playerRollOutcomes)
+        /// <summary>
+        /// Handles the click event for the "Merge Characters" button.
+        /// Allows users to merge roll statistics of multiple characters.
+        /// </summary>
+        private void btnMergeCharacters_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                // Get selected characters
+                var selectedCharacters = clbCharacters.CheckedItems.Cast<string>().ToList();
+
+                if (selectedCharacters.Count < 2)
+                {
+                    MessageBox.Show("Please select at least two characters to merge.", "Merge Characters", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+
+                // Prompt user for a name for the merged character
+                string mergedCharacterName = PromptForMergedCharacterName(selectedCharacters);
+
+                if (string.IsNullOrEmpty(mergedCharacterName))
+                {
+                    // User canceled or didn't provide a name
+                    return;
+                }
+
+                // Check if a character with this name already exists
+                if (allPlayerRollOutcomes.ContainsKey(mergedCharacterName))
+                {
+                    MessageBox.Show("A character with this name already exists. Please choose a different name.", "Merge Characters", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+
+                // Merge the player data
+                PlayerData mergedPlayerData = MergePlayerData(selectedCharacters, mergedCharacterName);
+
+                // Add the merged player data to the dictionary
+                allPlayerRollOutcomes[mergedCharacterName] = mergedPlayerData;
+
+                // Add the merged character to the clbCharacters list
+                clbCharacters.Items.Add(mergedCharacterName, true);
+
+                // Optionally, uncheck the original characters
+                foreach (string character in selectedCharacters)
+                {
+                    int index = clbCharacters.Items.IndexOf(character);
+                    if (index >= 0)
+                    {
+                        clbCharacters.SetItemChecked(index, false);
+                    }
+                }
+
+                // Update the roll stats grid
+                UpdateRollStatsGridForSelectedCharacters();
+            }
+            catch (Exception ex)
+            {
+                LogError(ex);
+                MessageBox.Show("An error occurred while merging characters. Please check the error.log file for details.",
+                    "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        /// <summary>
+        /// Prompts the user for a name for the merged character.
+        /// </summary>
+        private string PromptForMergedCharacterName(List<string> selectedCharacters)
+        {
+            // Default name for the merged character
+            string defaultName = $"{string.Join(", ", selectedCharacters)} (Merged)";
+            string promptMessage = "Enter a name for the merged character:";
+            string title = "Merge Characters";
+
+            // Use InputBox to get the name
+            string input = Microsoft.VisualBasic.Interaction.InputBox(promptMessage, title, defaultName);
+
+            return input.Trim();
+        }
+
+        /// <summary>
+        /// Merges the roll data of selected characters into a new PlayerData object.
+        /// </summary>
+        private PlayerData MergePlayerData(List<string> selectedCharacters, string mergedCharacterName)
+        {
+            PlayerData mergedPlayerData = new PlayerData
+            {
+                PlayerName = mergedCharacterName,
+                RollDataByKey = new Dictionary<string, RollData>()
+            };
+
+            foreach (string character in selectedCharacters)
+            {
+                if (allPlayerRollOutcomes.TryGetValue(character, out PlayerData playerData))
+                {
+                    foreach (var kvp in playerData.RollDataByKey)
+                    {
+                        string rollKey = kvp.Key;
+                        RollData rollData = kvp.Value;
+
+                        if (!mergedPlayerData.RollDataByKey.TryGetValue(rollKey, out RollData mergedRollData))
+                        {
+                            mergedRollData = new RollData { DiceRollKey = rollKey };
+                            mergedPlayerData.RollDataByKey[rollKey] = mergedRollData;
+                        }
+
+                        // Merge the roll results
+                        mergedRollData.Results.AddRange(rollData.Results);
+                    }
+                }
+            }
+
+            return mergedPlayerData;
+        }
+
+        #endregion
+
+        #region Roll Statistics Grid
+
+        /// <summary>
+        /// Updates the roll statistics grid with the provided player roll outcomes.
+        /// Displays overall stats per base roll (without modifiers).
+        /// </summary>
+        private void UpdateRollStatsGrid(Dictionary<string, PlayerData> playerRollOutcomes)
         {
             try
             {
@@ -404,34 +800,54 @@ namespace Roll_stats
                     dgvRollStats.Rows.Clear();
                     dgvRollStats.Columns.Clear();
 
+                    // Define columns
                     dgvRollStats.Columns.Add("Player", "Player");
                     dgvRollStats.Columns.Add("Roll", "Roll");
-                    dgvRollStats.Columns.Add("Total Rolls", "Total Rolls");
+                    dgvRollStats.Columns.Add("TotalRolls", "Total Rolls");
                     dgvRollStats.Columns.Add("Average", "Average");
                     dgvRollStats.Columns.Add("Median", "Median");
                     dgvRollStats.Columns.Add("Mode", "Mode");
-                    dgvRollStats.Columns.Add("1s Rolled", "1s Rolled");
-                    dgvRollStats.Columns.Add("Max Rolls", "Max Rolls");
+                    dgvRollStats.Columns.Add("OnesRolled", "1's Rolled");
+                    dgvRollStats.Columns.Add("MaxRolls", "Max Rolls");
 
-                    foreach (var player in playerRollOutcomes.Keys)
+                    // Populate rows
+                    foreach (var player in playerRollOutcomes.Values)
                     {
-                        foreach (var roll in playerRollOutcomes[player].Keys)
+                        // Group RollData by base roll (DiceRollKey)
+                        var rollDataGroups = player.RollDataByKey.Values.GroupBy(rd => rd.DiceRollKey);
+
+                        foreach (var rollGroup in rollDataGroups)
                         {
-                            List<double> outcomes = playerRollOutcomes[player][roll];
-                            List<double> sortedOutcomes = outcomes.OrderBy(o => o).ToList();
+                            string baseRoll = rollGroup.Key;
 
-                            double average = outcomes.Average();
-                            double median = GetMedian(sortedOutcomes);
-                            double mode = GetMode(sortedOutcomes);
-                            int countOnes = outcomes.Count(o => o == 1);
-                            double maxRollValue = GetMaxRollValue(roll);
-                            int countMax = outcomes.Count(o => o == maxRollValue);
-                            int totalRolls = outcomes.Count;
+                            // Collect all die roll values across all RollData with the same base roll
+                            List<double> dieRolls = rollGroup.SelectMany(rd => rd.Results.Select(r => r.DieRollValue)).ToList();
 
-                            dgvRollStats.Rows.Add(player, roll, totalRolls, average, median, mode, countOnes, countMax);
+                            if (dieRolls.Count == 0) continue;
+
+                            double avgDieRoll = dieRolls.Average();
+                            double median = GetMedian(dieRolls.OrderBy(r => r).ToList());
+                            var modeResult = GetMode(dieRolls);
+                            string modeFormatted = $"{modeResult.Item1} | {modeResult.Item2} times";
+                            int onesRolled = dieRolls.Count(r => r == 1);
+                            double maxRollValue = GetMaxDieRollValue(baseRoll);
+                            int maxRolls = dieRolls.Count(r => r == maxRollValue);
+                            int totalRollsCount = dieRolls.Count;
+
+                            dgvRollStats.Rows.Add(
+                                player.PlayerName,
+                                baseRoll,
+                                totalRollsCount,
+                                Math.Round(avgDieRoll, 2),
+                                median,
+                                modeFormatted,
+                                onesRolled,
+                                maxRolls
+                            );
                         }
                     }
 
+                    // Sort the grid by player name
                     dgvRollStats.Sort(dgvRollStats.Columns["Player"], System.ComponentModel.ListSortDirection.Ascending);
                     dgvRollStats.ResumeLayout();
                 }));
@@ -439,21 +855,179 @@ namespace Roll_stats
             catch (Exception ex)
             {
                 LogError(ex);
-                MessageBox.Show("An error occurred while updating the grid. Please check the error.log file for details.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show("An error occurred while updating the grid. Please check the error.log file for details.",
+                    "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
+        /// <summary>
+        /// Handles the SelectionChanged event for the roll stats grid.
+        /// Updates the roll reasons grid based on the selected roll.
+        /// </summary>
+        private void dgvRollStats_SelectionChanged(object sender, EventArgs e)
+        {
+            try
+            {
+                if (dgvRollStats.SelectedRows.Count == 1)
+                {
+                    var selectedRow = dgvRollStats.SelectedRows[0];
+
+                    // Ensure the selected row is a data row and not a new row placeholder
+                    if (!selectedRow.IsNewRow)
+                    {
+                        // Access cells safely
+                        var playerCell = selectedRow.Cells["Player"];
+                        var rollCell = selectedRow.Cells["Roll"];
+
+                        if (playerCell?.Value != null && rollCell?.Value != null)
+                        {
+                            string playerName = playerCell.Value.ToString();
+                            string baseRoll = rollCell.Value.ToString();
+
+                            UpdateRollReasonsGrid(playerName, baseRoll);
+                        }
+                        else
+                        {
+                            // Clear the reasons grid if cell values are null
+                            dgvRollReasons.Rows.Clear();
+                            dgvRollReasons.Columns.Clear();
+                        }
+                    }
+                    else
+                    {
+                        // Clear the reasons grid if the selected row is not valid
+                        dgvRollReasons.Rows.Clear();
+                        dgvRollReasons.Columns.Clear();
+                    }
+                }
+                else
+                {
+                    // Clear the reasons grid if no row or multiple rows are selected
+                    dgvRollReasons.Rows.Clear();
+                    dgvRollReasons.Columns.Clear();
+                }
+            }
+            catch (Exception ex)
+            {
+                LogError(ex);
+                MessageBox.Show("An error occurred while processing the selection. Please check the error.log file for details.",
+                    "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        #endregion
+
+        #region Roll Reasons Grid
+
+        /// <summary>
+        /// Updates the roll reasons grid based on the selected player and base roll.
+        /// Displays detailed stats per roll reason (flavor), including modifiers.
+        /// </summary>
+        private void UpdateRollReasonsGrid(string playerName, string baseRoll)
+        {
+            try
+            {
+                Invoke(new Action(() =>
+                {
+                    dgvRollReasons.SuspendLayout();
+                    dgvRollReasons.Rows.Clear();
+                    dgvRollReasons.Columns.Clear();
+
+                    // Define columns
+                    dgvRollReasons.Columns.Add("Roll", "Roll");
+                    dgvRollReasons.Columns.Add("TotalRolls", "Total Rolls");
+                    dgvRollReasons.Columns.Add("AvgDieRoll", "Average (no mod)");
+                    dgvRollReasons.Columns.Add("AvgTotalRoll", "Average (w/ mod)");
+                    dgvRollReasons.Columns.Add("MedianDieRoll", "Median (no mod)");
+                    dgvRollReasons.Columns.Add("ModeDieRoll", "Mode (no mod)");
+                    dgvRollReasons.Columns.Add("OnesRolled", "1's Rolled");
+                    dgvRollReasons.Columns.Add("MaxRolls", "Max Rolls");
+                    dgvRollReasons.Columns.Add("GrandTotal", "Grand Total");
+
+                    if (allPlayerRollOutcomes.TryGetValue(playerName, out PlayerData playerData))
+                    {
+                        // Get all RollData with the specified base roll
+                        var rollDatas = playerData.RollDataByKey.Values.Where(rd => rd.DiceRollKey == baseRoll).ToList();
+
+                        if (rollDatas.Count > 0)
+                        {
+                            // Collect all RollResults
+                            var allResults = rollDatas.SelectMany(rd => rd.Results).ToList();
+
+                            // Group by Flavor (Roll Reason)
+                            var flavorGroups = allResults.GroupBy(r => r.Flavor);
+
+                            foreach (var flavorGroup in flavorGroups)
+                            {
+                                List<double> dieRolls = flavorGroup.Select(r => r.DieRollValue).ToList();
+                                List<double> totalRolls = flavorGroup.Select(r => r.TotalValue).ToList();
+
+                                if (dieRolls.Count == 0) continue;
+
+                                // Calculations based on die rolls only
+                                double avgDieRoll = dieRolls.Average();
+                                double medianDieRoll = GetMedian(dieRolls.OrderBy(r => r).ToList());
+                                var modeDieRollResult = GetMode(dieRolls);
+                                string modeDieRollFormatted = $"{modeDieRollResult.Item1} | {modeDieRollResult.Item2} times";
+                                int onesRolled = dieRolls.Count(r => r == 1);
+                                double maxDieRollValue = GetMaxDieRollValue(baseRoll);
+                                int maxRolls = dieRolls.Count(r => r == maxDieRollValue);
+
+                                // Calculations including modifiers
+                                double avgTotalRoll = totalRolls.Average();
+                                double grandTotal = totalRolls.Sum();
+                                int totalRollsCount = flavorGroup.Count();
+
+                                dgvRollReasons.Rows.Add(
+                                    flavorGroup.Key,                                // Roll (Flavor)
+                                    totalRollsCount,                                // Total Rolls
+                                    Math.Round(avgDieRoll, 2),                      // Average (no mod)
+                                    Math.Round(avgTotalRoll, 2),                    // Average (w/ mod)
+                                    medianDieRoll,                                  // Median (no mod)
+                                    modeDieRollFormatted,                           // Mode (no mod)
+                                    onesRolled,                                     // 1's Rolled
+                                    maxRolls,                                       // Max Rolls (die roll only)
+                                    grandTotal                                      // Grand Total (includes modifiers)
+                                );
+                            }
+                        }
+                    }
+
+                    dgvRollReasons.ResumeLayout();
+                }));
+            }
+            catch (Exception ex)
+            {
+                LogError(ex);
+                MessageBox.Show("An error occurred while updating the reasons grid. Please check the error.log file for details.",
+                    "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        #endregion
+
+        #region Helper Methods
+
+        /// <summary>
+        /// Calculates the median of a sorted list of numbers.
+        /// </summary>
         private double GetMedian(List<double> sortedNumbers)
         {
             try
             {
                 int count = sortedNumbers.Count;
+                if (count == 0) return 0;
+
                 if (count % 2 == 0)
                 {
-                    return (sortedNumbers[count / 2 - 1] + sortedNumbers[count / 2]) / 2.0;
+                    // Even number of elements
+                    double a = sortedNumbers[count / 2 - 1];
+                    double b = sortedNumbers[count / 2];
+                    return (a + b) / 2.0;
                 }
                 else
                 {
+                    // Odd number of elements
                     return sortedNumbers[count / 2];
                 }
             }
@@ -464,37 +1038,121 @@ namespace Roll_stats
             }
         }
 
-        private double GetMode(List<double> numbers)
+        /// <summary>
+        /// Calculates the mode and its frequency from a list of numbers.
+        /// </summary>
+        private Tuple<double, int> GetMode(List<double> numbers)
         {
             try
             {
-                return numbers.GroupBy(n => n)
-                              .OrderByDescending(g => g.Count())
-                              .ThenBy(g => g.Key)
-                              .Select(g => g.Key)
-                              .FirstOrDefault();
+                if (numbers.Count == 0) return Tuple.Create(0.0, 0);
+
+                var grouped = numbers.GroupBy(n => n)
+                                     .Select(g => new { Value = g.Key, Count = g.Count() })
+                                     .OrderByDescending(g => g.Count)
+                                     .ThenBy(g => g.Value)
+                                     .ToList();
+
+                var modeGroup = grouped.FirstOrDefault();
+
+                if (modeGroup != null)
+                {
+                    return Tuple.Create(modeGroup.Value, modeGroup.Count);
+                }
             }
             catch (Exception ex)
             {
                 LogError(ex);
-                return 0;
             }
+            return Tuple.Create(0.0, 0);
         }
 
-        private double GetMaxRollValue(string roll)
+        /// <summary>
+        /// Calculates the maximum possible die roll value based on the base roll (without modifiers).
+        /// </summary>
+        private double GetMaxDieRollValue(string baseRoll)
         {
             try
             {
-                // Handling cases where roll may contain modifiers like "kh" or "kl"
-                var match = Regex.Match(roll, @"\d+d(\d+)");
-                if (match.Success)
+                if (string.IsNullOrWhiteSpace(baseRoll))
                 {
-                    var rollValueStr = match.Groups[1].Value;
-                    if (double.TryParse(rollValueStr, NumberStyles.Any, CultureInfo.InvariantCulture, out double rollValue))
+                    // Return 0 if baseRoll is empty or null
+                    return 0;
+                }
+
+                // Split the base roll into individual dice expressions
+                var diceExpressions = baseRoll.Split(new[] { '+', ' ' }, StringSplitOptions.RemoveEmptyEntries);
+
+                double maxRollValue = 0;
+
+                foreach (var diceExpr in diceExpressions)
+                {
+                    if (string.IsNullOrWhiteSpace(diceExpr))
                     {
-                        return rollValue;
+                        continue; // Skip empty expressions
+                    }
+
+                    var match = Regex.Match(diceExpr, @"^(?:max\(0,)?(?<num>\d*)d(?<faces>\d+)(?<keep>k(?:h|l|\d+))?\)?$");
+                    if (match.Success)
+                    {
+                        string numStr = match.Groups["num"].Value;
+                        string facesStr = match.Groups["faces"].Value;
+
+                        int numDice = 1; // Default to 1 if numStr is empty
+                        if (!string.IsNullOrEmpty(numStr))
+                        {
+                            if (!int.TryParse(numStr, out numDice))
+                            {
+                                // Continue if numDice is not a valid integer
+                                continue;
+                            }
+                        }
+
+                        if (!int.TryParse(facesStr, out int faces))
+                        {
+                            // Continue if faces is not a valid integer
+                            continue;
+                        }
+
+                        string keepOption = match.Groups["keep"].Value;
+
+                        // For dice expressions with keep options
+                        int diceKept = numDice;
+
+                        if (!string.IsNullOrEmpty(keepOption))
+                        {
+                            if (keepOption.StartsWith("kh"))
+                            {
+                                diceKept = numDice == 0 ? 1 : numDice; // Keep all dice if no number specified
+                            }
+                            else if (keepOption.StartsWith("kl"))
+                            {
+                                diceKept = numDice == 0 ? 1 : numDice; // Keep all dice if no number specified
+                            }
+                            else if (keepOption.StartsWith("k"))
+                            {
+                                string keepNumStr = keepOption.Substring(1);
+                                if (int.TryParse(keepNumStr, out int keepNum))
+                                {
+                                    diceKept = keepNum;
+                                }
+                                else
+                                {
+                                    diceKept = 1; // Default to 1 if parsing fails
+                                }
+                            }
+                        }
+
+                        maxRollValue += diceKept * faces;
+                    }
+                    else
+                    {
+                        // Unable to parse, skip this dice expression
+                        continue;
                     }
                 }
+
+                return maxRollValue;
             }
             catch (Exception ex)
             {
@@ -503,25 +1161,24 @@ namespace Roll_stats
             return 0; // Return 0 if unable to parse
         }
 
+
+        /// <summary>
+        /// Handles the CheckedChanged event for the debug checkbox.
+        /// Shows or hides debug information.
+        /// </summary>
         private void chbDebug_CheckedChanged(object sender, EventArgs e)
         {
             try
             {
-                if (chbDebug.Checked)
-                {
-                    lstSkippedRolls.Visible = true;
-                    lstInputRead.Visible = true;
-                }
-                else
-                {
-                    lstSkippedRolls.Visible = false;
-                    lstInputRead.Visible = false;
-                }
+                lstSkippedRolls.Visible = chbDebug.Checked;
+                lstInputRead.Visible = chbDebug.Checked;
             }
             catch (Exception ex)
             {
                 LogError(ex);
             }
         }
+
+        #endregion
     }
 }

@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("Roll-stats")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+44fb25f494f80874be13ad4d2b74335b71c18a5c")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+6b23504219559327c78c9b729b06a04d94fe9ecb")]
 [assembly: System.Reflection.AssemblyProductAttribute("Roll-stats")]
 [assembly: System.Reflection.AssemblyTitleAttribute("Roll-stats")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
